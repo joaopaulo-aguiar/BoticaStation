@@ -8,14 +8,18 @@ import {
   Settings,
   LogOut,
   Menu,
+  FileText,
+  LayoutDashboard,
   X,
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/shared/lib/utils'
 
 const navigation = [
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Contatos', href: '/contacts', icon: Users },
   { name: 'Campanhas', href: '/campaigns', icon: Send },
+  { name: 'Templates', href: '/templates', icon: FileText },
   { name: 'Cashback', href: '/cashback', icon: Wallet },
   { name: 'Relatórios', href: '/reports', icon: BarChart3 },
   { name: 'Configurações', href: '/settings', icon: Settings },

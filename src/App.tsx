@@ -6,6 +6,8 @@ import { CampaignsPage } from '@/features/campaigns/ui/campaigns-page'
 import { CashbackPage } from '@/features/cashback/ui/cashback-page'
 import { ReportsPage } from '@/features/reports/ui/reports-page'
 import { SettingsPage } from '@/features/settings/ui/settings-page'
+import { TemplatesPage } from '@/features/templates'
+import { DashboardPage } from '@/features/dashboard/ui/dashboard-page'
 import { AppLayout } from '@/shared/layout/app-layout'
 
 const queryClient = new QueryClient({
@@ -33,16 +35,18 @@ export function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<Navigate to="/contacts" replace />} />
+            <Route index element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/contacts" element={<ContactsPage />} />
             <Route path="/campaigns" element={<CampaignsPage />} />
+            <Route path="/templates" element={<TemplatesPage />} />
             <Route path="/cashback" element={<CashbackPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
 
           {/* Fallback */}
-          <Route path="*" element={<Navigate to="/contacts" replace />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>
