@@ -1,7 +1,8 @@
 /**
  * Settings store – persisted in localStorage.
- * Manages S3 bucket config for template backups and
- * DynamoDB table config for campaign analytics.
+ * Manages S3 bucket config for template backups,
+ * DynamoDB table config for campaign analytics,
+ * and SES sender profile configuration.
  */
 import { create } from 'zustand'
 
@@ -17,9 +18,25 @@ export interface DynamoTableConfig {
   region: string
 }
 
+/** A configured sender profile for email campaigns */
+export interface SenderProfile {
+  id: string
+  label: string        // e.g. "Marketing"
+  email: string        // e.g. "desperte@boticaalternativa.com.br"
+  displayName: string  // e.g. "Botica Alternativa"
+  replyTo?: string
+  isDefault?: boolean
+}
+
+export interface SesConfig {
+  region: string
+  senderProfiles: SenderProfile[]
+}
+
 export interface AppSettings {
   s3Bucket: S3BucketConfig
   campaignAnalyticsTable: DynamoTableConfig
+  ses: SesConfig
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -30,6 +47,10 @@ const DEFAULT_SETTINGS: AppSettings = {
   campaignAnalyticsTable: {
     tableName: '',
     region: 'sa-east-1',
+  },
+  ses: {
+    region: 'sa-east-1',
+    senderProfiles: [],
   },
 }
 
@@ -43,6 +64,11 @@ function loadSettings(): AppSettings {
       campaignAnalyticsTable: {
         ...DEFAULT_SETTINGS.campaignAnalyticsTable,
         ...parsed.campaignAnalyticsTable,
+      },
+      ses: {
+        ...DEFAULT_SETTINGS.ses,
+        ...parsed.ses,
+        senderProfiles: parsed.ses?.senderProfiles ?? [],
       },
     }
   } catch {
@@ -71,6 +97,10 @@ interface SettingsState {
   settings: AppSettings
   updateS3Bucket: (config: S3BucketConfig) => void
   updateCampaignTable: (config: DynamoTableConfig) => void
+  updateSesConfig: (config: Partial<SesConfig>) => void
+  addSenderProfile: (profile: SenderProfile) => void
+  updateSenderProfile: (id: string, data: Partial<SenderProfile>) => void
+  removeSenderProfile: (id: string) => void
   resetToDefaults: () => void
 }
 
@@ -88,6 +118,55 @@ export const useSettingsStore = create<SettingsState>((set) => ({
   updateCampaignTable: (config: DynamoTableConfig) => {
     set((state) => {
       const next = { ...state.settings, campaignAnalyticsTable: config }
+      saveSettings(next)
+      return { settings: next }
+    })
+  },
+
+  updateSesConfig: (config: Partial<SesConfig>) => {
+    set((state) => {
+      const next = {
+        ...state.settings,
+        ses: { ...state.settings.ses, ...config },
+      }
+      saveSettings(next)
+      return { settings: next }
+    })
+  },
+
+  addSenderProfile: (profile: SenderProfile) => {
+    set((state) => {
+      const profiles = [...state.settings.ses.senderProfiles, profile]
+      const next = {
+        ...state.settings,
+        ses: { ...state.settings.ses, senderProfiles: profiles },
+      }
+      saveSettings(next)
+      return { settings: next }
+    })
+  },
+
+  updateSenderProfile: (id: string, data: Partial<SenderProfile>) => {
+    set((state) => {
+      const profiles = state.settings.ses.senderProfiles.map((p) =>
+        p.id === id ? { ...p, ...data } : p,
+      )
+      const next = {
+        ...state.settings,
+        ses: { ...state.settings.ses, senderProfiles: profiles },
+      }
+      saveSettings(next)
+      return { settings: next }
+    })
+  },
+
+  removeSenderProfile: (id: string) => {
+    set((state) => {
+      const profiles = state.settings.ses.senderProfiles.filter((p) => p.id !== id)
+      const next = {
+        ...state.settings,
+        ses: { ...state.settings.ses, senderProfiles: profiles },
+      }
       saveSettings(next)
       return { settings: next }
     })
