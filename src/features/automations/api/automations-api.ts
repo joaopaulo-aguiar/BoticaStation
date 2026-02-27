@@ -1,7 +1,7 @@
 /**
  * Automations API — DynamoDB operations for automation workflows.
  *
- * Uses "Automations" table:
+ * Uses the shared "Config" table:
  *   PK: AUTOMATION#<uuid>  SK: METADATA  → Automation definition
  *   PK: AUTOEXEC#<automationId>  SK: CONTACT#<email>#<ts>  → Execution log
  */
@@ -24,7 +24,7 @@ import type {
   AutomationExecution,
 } from '../types'
 
-const TABLE_NAME = 'Automations'
+const TABLE_NAME = 'Config'
 
 // ─── CRUD ────────────────────────────────────────────────────────────────────
 

@@ -1,7 +1,7 @@
 /**
  * Segmentation API — DynamoDB operations for segments.
  *
- * Uses its own "Segments" table (single-table design):
+ * Uses the shared "Config" table (single-table design):
  *   PK: SEGMENT#<uuid>  SK: METADATA     → Segment definition
  *   PK: SEGMENT#<uuid>  SK: MEMBER#<email> → Static segment member
  *
@@ -28,7 +28,7 @@ import type {
   ConditionOperator,
 } from '../types'
 
-const TABLE_NAME = 'Segments'
+const TABLE_NAME = 'Config'
 const CONTACT_TABLE = 'Contact'
 
 // ─── CRUD ────────────────────────────────────────────────────────────────────

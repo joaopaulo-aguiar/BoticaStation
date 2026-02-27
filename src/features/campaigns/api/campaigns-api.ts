@@ -32,8 +32,7 @@ import type { Campaign, CampaignFormData, CampaignStats, EMPTY_STATS } from '../
 const SES_REGION = 'sa-east-1'
 
 function getTableName(): string {
-  const { campaignAnalyticsTable } = useSettingsStore.getState().settings
-  return campaignAnalyticsTable.tableName || 'Campaigns'
+  return 'Config'
 }
 
 function createSES(credentials: AWSSessionCredentials): SESv2Client {

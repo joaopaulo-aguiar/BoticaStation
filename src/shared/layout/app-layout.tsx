@@ -56,9 +56,13 @@ export function AppLayout() {
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
-        {/* Brand Name */}
-        <div className="flex h-16 items-center gap-2.5 px-4 border-b border-slate-100">
-          <span className="text-lg font-bold text-botica-600 tracking-tight">BoticaStation</span>
+        {/* Logo + Brand */}
+        <div className="flex h-16 items-center justify-center px-4 border-b border-slate-100">
+          <img
+            src="/logo-horizontal.svg"
+            alt="Botica Alternativa"
+            className="h-8 w-auto"
+          />
           <button
             className="ml-auto lg:hidden text-slate-400 hover:text-slate-600 cursor-pointer"
             onClick={() => setSidebarOpen(false)}
@@ -67,8 +71,13 @@ export function AppLayout() {
           </button>
         </div>
 
+        {/* Version label */}
+        <div className="px-4 py-2">
+          <span className="text-[11px] font-medium text-slate-900 tracking-tight">BoticaStation v. 0.5.3</span>
+        </div>
+
         {/* Nav */}
-        <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
+        <nav className="flex-1 px-3 py-0.5 space-y-0.5 overflow-y-auto">
           {navigation.map((item) => (
             <NavLink
               key={item.name}
@@ -89,15 +98,8 @@ export function AppLayout() {
           ))}
         </nav>
 
-        {/* Logo + Logout */}
-        <div className="border-t border-slate-100 px-3 py-3 space-y-2">
-          <div className="flex items-center justify-center px-3 py-1">
-            <img
-              src="/logo-horizontal.svg"
-              alt="Botica Alternativa"
-              className="h-7 w-auto opacity-60"
-            />
-          </div>
+        {/* Logout */}
+        <div className="border-t border-slate-100 px-3 py-3">
           <button
             onClick={handleLogout}
             className="flex items-center gap-2.5 w-full px-3 py-2 rounded-md text-sm font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
