@@ -52,13 +52,9 @@ export function AppLayout() {
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
-        {/* Logo */}
+        {/* Brand Name */}
         <div className="flex h-16 items-center gap-2.5 px-4 border-b border-slate-100">
-          <img
-            src="/logo-horizontal.svg"
-            alt="Botica Alternativa"
-            className="h-8 w-auto"
-          />
+          <span className="text-lg font-bold text-botica-600 tracking-tight">BoticaStation</span>
           <button
             className="ml-auto lg:hidden text-slate-400 hover:text-slate-600 cursor-pointer"
             onClick={() => setSidebarOpen(false)}
@@ -89,8 +85,15 @@ export function AppLayout() {
           ))}
         </nav>
 
-        {/* Logout */}
-        <div className="border-t border-slate-100 px-3 py-3">
+        {/* Logo + Logout */}
+        <div className="border-t border-slate-100 px-3 py-3 space-y-2">
+          <div className="flex items-center justify-center px-3 py-1">
+            <img
+              src="/logo-horizontal.svg"
+              alt="Botica Alternativa"
+              className="h-7 w-auto opacity-60"
+            />
+          </div>
           <button
             onClick={handleLogout}
             className="flex items-center gap-2.5 w-full px-3 py-2 rounded-md text-sm font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
@@ -111,7 +114,7 @@ export function AppLayout() {
           >
             <Menu className="w-5 h-5" />
           </button>
-          <span className="text-sm font-semibold text-slate-900">Botica Station</span>
+          <span className="text-sm font-bold text-botica-600">BoticaStation</span>
         </header>
 
         {/* Page Content */}

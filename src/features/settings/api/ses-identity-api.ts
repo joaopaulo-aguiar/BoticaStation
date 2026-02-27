@@ -15,6 +15,10 @@ import {
   GetEmailIdentityCommand,
   CreateEmailIdentityCommand,
   DeleteEmailIdentityCommand,
+  GetAccountCommand,
+  ListConfigurationSetsCommand,
+  GetConfigurationSetCommand,
+  ListSuppressedDestinationsCommand,
   type IdentityType,
   type DkimAttributes,
 } from '@aws-sdk/client-sesv2'
@@ -204,3 +208,114 @@ export function getDkimRecords(identityName: string, tokens: string[]): DkimReco
     type: 'CNAME' as const,
   }))
 }
+
+// ─── SES Account Info ────────────────────────────────────────────────────────
+
+export interface SesAccountInfo {
+  sendingEnabled: boolean
+  enforcementStatus: string // HEALTHY | PROBATION | SHUTDOWN
+  productionAccessEnabled: boolean
+  sendQuota: {
+    max24HourSend: number
+    maxSendRate: number
+    sentLast24Hours: number
+  }
+  dedicatedIpAutoWarmupEnabled: boolean
+  details?: string
+}
+
+/**
+ * Get SES account-level information: sending quotas, reputation, production access.
+ */
+export async function getAccountInfo(
+  credentials: AWSSessionCredentials,
+): Promise<SesAccountInfo> {
+  const client = createSES(credentials)
+  const response = await client.send(new GetAccountCommand({}))
+
+  return {
+    sendingEnabled: response.SendingEnabled ?? false,
+    enforcementStatus: response.EnforcementStatus ?? 'UNKNOWN',
+    productionAccessEnabled: response.ProductionAccessEnabled ?? false,
+    sendQuota: {
+      max24HourSend: response.SendQuota?.Max24HourSend ?? 0,
+      maxSendRate: response.SendQuota?.MaxSendRate ?? 0,
+      sentLast24Hours: response.SendQuota?.SentLast24Hours ?? 0,
+    },
+    dedicatedIpAutoWarmupEnabled: response.DedicatedIpAutoWarmupEnabled ?? false,
+    details: response.Details ?? undefined,
+  }
+}
+
+// ─── Configuration Sets ──────────────────────────────────────────────────────
+
+export interface SesConfigurationSet {
+  name: string
+}
+
+/**
+ * List SES configuration sets.
+ */
+export async function listConfigurationSets(
+  credentials: AWSSessionCredentials,
+): Promise<SesConfigurationSet[]> {
+  const client = createSES(credentials)
+  const result: SesConfigurationSet[] = []
+  let nextToken: string | undefined
+
+  do {
+    const response = await client.send(
+      new ListConfigurationSetsCommand({
+        ...(nextToken ? { NextToken: nextToken } : {}),
+      }),
+    )
+
+    for (const name of response.ConfigurationSets ?? []) {
+      result.push({ name: name ?? '' })
+    }
+
+    nextToken = response.NextToken
+  } while (nextToken)
+
+  return result
+}
+
+// ─── Suppression List ────────────────────────────────────────────────────────
+
+export interface SesSuppressedDestination {
+  email: string
+  reason: string
+  lastUpdateTime: string
+}
+
+/**
+ * List suppressed email destinations.
+ */
+export async function listSuppressedDestinations(
+  credentials: AWSSessionCredentials,
+): Promise<SesSuppressedDestination[]> {
+  const client = createSES(credentials)
+  const result: SesSuppressedDestination[] = []
+  let nextToken: string | undefined
+
+  do {
+    const response = await client.send(
+      new ListSuppressedDestinationsCommand({
+        ...(nextToken ? { NextToken: nextToken } : {}),
+      }),
+    )
+
+    for (const item of response.SuppressedDestinationSummaries ?? []) {
+      result.push({
+        email: item.EmailAddress ?? '',
+        reason: item.Reason ?? 'UNKNOWN',
+        lastUpdateTime: item.LastUpdateTime?.toISOString() ?? '',
+      })
+    }
+
+    nextToken = response.NextToken
+  } while (nextToken)
+
+  return result
+}
+

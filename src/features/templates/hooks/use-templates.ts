@@ -69,6 +69,7 @@ export function useCreateTemplate() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: TEMPLATES_KEY })
+      queryClient.invalidateQueries({ queryKey: ['template-metadata'] })
     },
   })
 }
@@ -83,13 +84,14 @@ export function useUpdateTemplate() {
       data,
     }: {
       name: string
-      data: { subject: string; html: string; text?: string; testData?: Record<string, unknown> }
+      data: { subject: string; html: string; text?: string; testData?: Record<string, unknown>; displayName?: string }
     }) => {
       const creds = getCreds()
       return updateTemplate(creds, name, data)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: TEMPLATES_KEY })
+      queryClient.invalidateQueries({ queryKey: ['template-metadata'] })
     },
   })
 }
@@ -105,6 +107,7 @@ export function useDeleteTemplate() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: TEMPLATES_KEY })
+      queryClient.invalidateQueries({ queryKey: ['template-metadata'] })
     },
   })
 }
@@ -120,6 +123,7 @@ export function useDuplicateTemplate() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: TEMPLATES_KEY })
+      queryClient.invalidateQueries({ queryKey: ['template-metadata'] })
     },
   })
 }

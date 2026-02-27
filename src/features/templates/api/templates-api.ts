@@ -23,6 +23,12 @@ import {
   useSettingsStore,
   extractBucketName,
 } from '@/features/settings/store/settings-store'
+import {
+  toSesTemplateName,
+  saveTemplateMetadata,
+  listTemplateMetadata,
+  deleteTemplateMetadata,
+} from '@/features/settings/api/config-api'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -64,8 +70,10 @@ function createS3Client(credentials: AWSSessionCredentials): S3Client {
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface TemplateSummary {
-  name: string
+  name: string // SES template name (slug)
+  displayName: string // User-friendly name
   createdAt: string | null
+  updatedAt: string | null
 }
 
 export interface TemplateDetail {
@@ -116,10 +124,31 @@ export async function listTemplates(
     }),
   )
 
-  const templates: TemplateSummary[] = (response.TemplatesMetadata ?? []).map((t) => ({
-    name: t.TemplateName ?? '',
-    createdAt: t.CreatedTimestamp ? t.CreatedTimestamp.toISOString() : null,
-  }))
+  // Load metadata from Config table
+  let metadataMap: Record<string, { displayName: string; createdAt: string; updatedAt: string }> = {}
+  try {
+    const metadata = await listTemplateMetadata(credentials)
+    for (const m of metadata) {
+      metadataMap[m.sesTemplateName] = {
+        displayName: m.displayName,
+        createdAt: m.createdAt,
+        updatedAt: m.updatedAt,
+      }
+    }
+  } catch {
+    // Config table might not exist yet; silently continue
+  }
+
+  const templates: TemplateSummary[] = (response.TemplatesMetadata ?? []).map((t) => {
+    const sesName = t.TemplateName ?? ''
+    const meta = metadataMap[sesName]
+    return {
+      name: sesName,
+      displayName: meta?.displayName ?? sesName,
+      createdAt: meta?.createdAt ?? (t.CreatedTimestamp ? t.CreatedTimestamp.toISOString() : null),
+      updatedAt: meta?.updatedAt ?? null,
+    }
+  })
 
   return { templates, nextToken: response.NextToken }
 }
@@ -159,12 +188,15 @@ export async function getTemplate(
 export async function createTemplate(
   credentials: AWSSessionCredentials,
   data: { name: string; subject: string; html: string; text?: string; testData?: Record<string, unknown> },
-): Promise<{ success: boolean; message: string }> {
+): Promise<{ success: boolean; message: string; sesName: string }> {
   const client = createSESv2Client(credentials)
+
+  // Convert display name to SES-safe slug
+  const sesName = toSesTemplateName(data.name)
 
   await client.send(
     new CreateEmailTemplateCommand({
-      TemplateName: data.name,
+      TemplateName: sesName,
       TemplateContent: {
         Subject: data.subject,
         Html: data.html,
@@ -173,22 +205,32 @@ export async function createTemplate(
     }),
   )
 
+  // Save display name ↔ SES name mapping in Config table
+  try {
+    await saveTemplateMetadata(credentials, {
+      displayName: data.name,
+      sesTemplateName: sesName,
+    })
+  } catch (err) {
+    console.warn('Failed to save template metadata:', err)
+  }
+
   // Backup to S3 (non-blocking – don't fail the operation)
   backupTemplateToS3(credentials, {
-    templateName: data.name,
+    templateName: sesName,
     subject: data.subject,
     html: data.html,
     text: data.text ?? null,
     testData: data.testData ?? null,
   }).catch((err) => console.warn('Backup to S3 failed:', err))
 
-  return { success: true, message: `Template "${data.name}" criado com sucesso` }
+  return { success: true, message: `Template "${data.name}" criado com sucesso`, sesName }
 }
 
 export async function updateTemplate(
   credentials: AWSSessionCredentials,
   templateName: string,
-  data: { subject: string; html: string; text?: string; testData?: Record<string, unknown> },
+  data: { subject: string; html: string; text?: string; testData?: Record<string, unknown>; displayName?: string },
 ): Promise<{ success: boolean; message: string }> {
   const client = createSESv2Client(credentials)
 
@@ -212,6 +254,18 @@ export async function updateTemplate(
     testData: data.testData ?? null,
   }).catch((err) => console.warn('Backup to S3 failed:', err))
 
+  // Update metadata timestamp
+  if (data.displayName) {
+    try {
+      await saveTemplateMetadata(credentials, {
+        displayName: data.displayName,
+        sesTemplateName: templateName,
+      })
+    } catch (err) {
+      console.warn('Failed to update template metadata:', err)
+    }
+  }
+
   return { success: true, message: `Template "${templateName}" atualizado com sucesso` }
 }
 
@@ -223,17 +277,24 @@ export async function deleteTemplate(
 
   await client.send(new DeleteEmailTemplateCommand({ TemplateName: templateName }))
 
+  // Clean up metadata
+  try {
+    await deleteTemplateMetadata(credentials, templateName)
+  } catch (err) {
+    console.warn('Failed to delete template metadata:', err)
+  }
+
   return { success: true, message: `Template "${templateName}" excluído com sucesso` }
 }
 
 export async function duplicateTemplate(
   credentials: AWSSessionCredentials,
   sourceName: string,
-  newName: string,
-): Promise<{ success: boolean; message: string }> {
+  newDisplayName: string,
+): Promise<{ success: boolean; message: string; sesName: string }> {
   const source = await getTemplate(credentials, sourceName)
   return createTemplate(credentials, {
-    name: newName,
+    name: newDisplayName,
     subject: source.subject,
     html: source.html,
     text: source.text || undefined,

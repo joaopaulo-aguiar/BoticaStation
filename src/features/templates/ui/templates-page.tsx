@@ -62,13 +62,17 @@ import {
   ChevronRight,
   MoreVertical,
   FileCode,
+  ArrowUpDown,
+  Info,
 } from 'lucide-react'
+import { toSesTemplateName } from '@/features/settings/api/config-api'
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
 type EditorMode = 'list' | 'edit' | 'new'
 type PreviewDevice = 'desktop' | 'tablet' | 'mobile'
 type ActiveTab = 'code' | 'testdata'
+type SortMode = 'name-asc' | 'name-desc' | 'date-desc' | 'date-asc'
 
 const DEVICE_SIZES: Record<PreviewDevice, { width: number; height: number; label: string }> = {
   desktop: { width: 0, height: 0, label: 'Desktop' },
@@ -116,6 +120,8 @@ export function TemplatesPage() {
   const [selectedTemplateName, setSelectedTemplateName] = useState<string | null>(null)
 
   // ── Editor state ─────────────────────────────────────────────────────────
+  const [templateDisplayName, setTemplateDisplayName] = useState('')
+  const [templateSesName, setTemplateSesName] = useState('')
   const [templateName, setTemplateName] = useState('')
   const [templateSubject, setTemplateSubject] = useState('')
   const [templateHtml, setTemplateHtml] = useState(DEFAULT_HTML)
@@ -141,6 +147,7 @@ export function TemplatesPage() {
   const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false)
   const [duplicateTarget, setDuplicateTarget] = useState<string | null>(null)
   const [duplicateName, setDuplicateName] = useState('')
+  const [sortMode, setSortMode] = useState<SortMode>('name-asc')
   const [sendTestDialogOpen, setSendTestDialogOpen] = useState(false)
   const [toEmail, setToEmail] = useState('')
   const [fromEmail, setFromEmail] = useState('')
@@ -164,18 +171,66 @@ export function TemplatesPage() {
 
   const isSaving = createMutation.isPending || updateMutation.isPending
 
-  // ── Filtered templates ───────────────────────────────────────────────────
+  // ── Filtered & sorted templates ──────────────────────────────────────────
   const filteredTemplates = useMemo(() => {
     if (!templates) return []
-    if (!search) return templates
-    const q = search.toLowerCase()
-    return templates.filter((t) => t.name.toLowerCase().includes(q))
-  }, [templates, search])
+    let list = [...templates]
+    if (search) {
+      const q = search.toLowerCase()
+      list = list.filter(
+        (t) =>
+          t.displayName.toLowerCase().includes(q) ||
+          t.name.toLowerCase().includes(q),
+      )
+    }
+    switch (sortMode) {
+      case 'name-asc':
+        list.sort((a, b) => a.displayName.localeCompare(b.displayName, 'pt-BR'))
+        break
+      case 'name-desc':
+        list.sort((a, b) => b.displayName.localeCompare(a.displayName, 'pt-BR'))
+        break
+      case 'date-desc':
+        list.sort((a, b) => {
+          const da = a.updatedAt || a.createdAt || ''
+          const db = b.updatedAt || b.createdAt || ''
+          return db.localeCompare(da)
+        })
+        break
+      case 'date-asc':
+        list.sort((a, b) => {
+          const da = a.updatedAt || a.createdAt || ''
+          const db = b.updatedAt || b.createdAt || ''
+          return da.localeCompare(db)
+        })
+        break
+    }
+    return list
+  }, [templates, search, sortMode])
+
+  const cycleSortMode = () => {
+    setSortMode((prev) => {
+      const modes: SortMode[] = ['name-asc', 'name-desc', 'date-desc', 'date-asc']
+      const idx = modes.indexOf(prev)
+      return modes[(idx + 1) % modes.length]
+    })
+  }
+
+  const sortLabel = {
+    'name-asc': 'A → Z',
+    'name-desc': 'Z → A',
+    'date-desc': 'Recentes',
+    'date-asc': 'Antigos',
+  }[sortMode]
 
   // ── Load template data into editor ───────────────────────────────────────
   useEffect(() => {
     if (templateQuery.data && mode === 'edit') {
       const t = templateQuery.data
+      setTemplateSesName(t.name)
+      // Find display name from templates list
+      const meta = templates?.find((tpl) => tpl.name === t.name)
+      setTemplateDisplayName(meta?.displayName ?? t.name)
       setTemplateName(t.name)
       setTemplateSubject(t.subject)
       setTemplateHtml(t.html)
@@ -184,7 +239,7 @@ export function TemplatesPage() {
         setTestDataJson(JSON.stringify(t.testData, null, 2))
       }
     }
-  }, [templateQuery.data, mode])
+  }, [templateQuery.data, mode, templates])
 
   // ── Preview rendering (real-time) ────────────────────────────────────────
   useEffect(() => {
@@ -273,6 +328,8 @@ export function TemplatesPage() {
   const handleNewTemplate = () => {
     setMode('new')
     setSelectedTemplateName(null)
+    setTemplateDisplayName('')
+    setTemplateSesName('')
     setTemplateName('')
     setTemplateSubject('')
     setTemplateHtml(DEFAULT_HTML)
@@ -293,7 +350,8 @@ export function TemplatesPage() {
   }
 
   const handleSave = () => {
-    if (!templateName.trim() || !templateSubject.trim()) return
+    if (mode === 'new' && !templateDisplayName.trim()) return
+    if (!templateSubject.trim()) return
 
     const testData = safeParseJsonObject(testDataJson)
     const data = {
@@ -305,16 +363,22 @@ export function TemplatesPage() {
 
     if (mode === 'new') {
       createMutation.mutate(
-        { name: templateName, ...data },
+        { name: templateDisplayName, ...data },
         {
-          onSuccess: () => {
+          onSuccess: (result) => {
             setMode('edit')
-            setSelectedTemplateName(templateName)
+            const sesName = result.sesName
+            setSelectedTemplateName(sesName)
+            setTemplateSesName(sesName)
+            setTemplateName(sesName)
           },
         },
       )
     } else {
-      updateMutation.mutate({ name: templateName, data })
+      updateMutation.mutate({
+        name: templateSesName || templateName,
+        data: { ...data, displayName: templateDisplayName },
+      })
     }
   }
 
@@ -338,7 +402,8 @@ export function TemplatesPage() {
 
   const handleDuplicate = (name: string) => {
     setDuplicateTarget(name)
-    setDuplicateName(`${name}-copy`)
+    const meta = templates?.find((t) => t.name === name)
+    setDuplicateName(`${meta?.displayName ?? name} - cópia`)
     setDuplicateDialogOpen(true)
   }
 
@@ -401,7 +466,7 @@ export function TemplatesPage() {
             if (parsed.subject) setTemplateSubject(parsed.subject)
             if (parsed.text) setTemplateText(parsed.text)
             if (parsed.testData) setTestDataJson(JSON.stringify(parsed.testData, null, 2))
-            if (parsed.templateName) setTemplateName(parsed.templateName)
+            if (parsed.templateName) setTemplateDisplayName(parsed.templateName)
           } else {
             setTestDataJson(content)
           }
@@ -418,7 +483,8 @@ export function TemplatesPage() {
 
   const handleDownloadJson = () => {
     const data = {
-      templateName: templateName,
+      templateName: templateDisplayName || templateName,
+      sesName: templateSesName || templateName,
       subject: templateSubject,
       html: templateHtml,
       text: templateText,
@@ -428,7 +494,7 @@ export function TemplatesPage() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${templateName || 'template'}.json`
+    a.download = `${templateDisplayName || templateName || 'template'}.json`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -482,6 +548,14 @@ export function TemplatesPage() {
                 className="pl-8 h-8 text-xs"
               />
             </div>
+            <button
+              onClick={cycleSortMode}
+              className="flex items-center gap-1 mt-2 text-[10px] text-slate-500 hover:text-botica-600 cursor-pointer transition-colors"
+              title="Clique para alternar a ordenação"
+            >
+              <ArrowUpDown className="w-3 h-3" />
+              Ordenar: {sortLabel}
+            </button>
           </div>
 
           {/* Template list */}
@@ -510,9 +584,15 @@ export function TemplatesPage() {
                         : 'text-slate-700 hover:bg-slate-50'
                     }`}
                     onClick={() => handleSelectTemplate(t.name)}
+                    title={`${t.displayName}\nSES: ${t.name}${t.createdAt ? '\nCriado: ' + new Date(t.createdAt).toLocaleDateString('pt-BR') : ''}${t.updatedAt ? '\nAtualizado: ' + new Date(t.updatedAt).toLocaleDateString('pt-BR') : ''}`}
                   >
                     <FileCode className="w-3.5 h-3.5 flex-shrink-0 opacity-50" />
-                    <span className="flex-1 truncate text-xs font-medium">{t.name}</span>
+                    <div className="flex-1 min-w-0">
+                      <span className="block truncate text-xs font-medium">{t.displayName}</span>
+                      {t.displayName !== t.name && (
+                        <span className="block truncate text-[10px] text-slate-400 font-mono">{t.name}</span>
+                      )}
+                    </div>
                     <button
                       className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-slate-200 cursor-pointer"
                       onClick={(e) => handleContextMenu(e, t.name)}
@@ -565,7 +645,7 @@ export function TemplatesPage() {
                       onClick={() => handleSelectTemplate(t.name)}
                     >
                       <FileCode className="w-4 h-4 text-slate-400" />
-                      <span className="flex-1 text-sm font-medium truncate">{t.name}</span>
+                      <span className="flex-1 text-sm font-medium truncate">{t.displayName}</span>
                       <ChevronRight className="w-4 h-4 text-slate-300" />
                     </div>
                   ))}
@@ -588,13 +668,24 @@ export function TemplatesPage() {
                 {/* Template name */}
                 <div className="flex items-center gap-1.5">
                   <Label className="text-xs text-slate-500 whitespace-nowrap">Nome:</Label>
-                  <Input
-                    value={templateName}
-                    onChange={(e) => setTemplateName(e.target.value)}
-                    placeholder="nome-do-template"
-                    className="h-7 text-xs w-44"
-                    disabled={mode === 'edit'}
-                  />
+                  <div className="relative group">
+                    <Input
+                      value={templateDisplayName}
+                      onChange={(e) => setTemplateDisplayName(e.target.value)}
+                      placeholder="Nome do template (ex: Promo | Black Friday)"
+                      className="h-7 text-xs w-52"
+                    />
+                    {templateDisplayName && (
+                      <div className="absolute left-0 top-full mt-1 z-50 hidden group-hover:block bg-slate-800 text-white text-[10px] px-2 py-1 rounded shadow-lg font-mono whitespace-nowrap">
+                        SES: {mode === 'new' ? toSesTemplateName(templateDisplayName) : templateSesName}
+                      </div>
+                    )}
+                  </div>
+                  {mode === 'edit' && templateSesName && (
+                    <span className="text-[10px] text-slate-400 font-mono truncate max-w-32 hidden lg:inline" title={`Identificador SES: ${templateSesName}`}>
+                      <Info className="w-3 h-3 inline mr-0.5" />{templateSesName}
+                    </span>
+                  )}
                 </div>
 
                 {/* Subject */}
@@ -650,7 +741,7 @@ export function TemplatesPage() {
                     size="sm"
                     className="h-7 text-xs"
                     onClick={handleSave}
-                    disabled={isSaving || !templateName.trim() || !templateSubject.trim()}
+                    disabled={isSaving || (!templateDisplayName.trim() && mode === 'new') || !templateSubject.trim()}
                   >
                     {isSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
                     Salvar
@@ -892,16 +983,21 @@ export function TemplatesPage() {
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-sm text-slate-600">
-              Duplicando: <strong>{duplicateTarget}</strong>
+              Duplicando: <strong>{templates?.find((t) => t.name === duplicateTarget)?.displayName ?? duplicateTarget}</strong>
             </p>
             <div>
               <Label className="text-xs">Nome do novo template</Label>
               <Input
                 value={duplicateName}
                 onChange={(e) => setDuplicateName(e.target.value)}
-                placeholder="nome-do-novo-template"
+                placeholder="Nome amigável (ex: Promo | Verão)"
                 className="mt-1"
               />
+              {duplicateName.trim() && (
+                <p className="text-[10px] text-slate-400 mt-1 font-mono">
+                  SES: {toSesTemplateName(duplicateName)}
+                </p>
+              )}
             </div>
           </div>
           <DialogFooter>
