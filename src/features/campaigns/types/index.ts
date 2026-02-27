@@ -46,8 +46,20 @@ export interface Campaign {
   senderName?: string
   /** Reply-to address */
   replyTo?: string
-  /** Contact tags/segments to target */
+  /** Contact tags to target (legacy) */
   recipientTags: string[]
+  /** Segment IDs to include as audience */
+  segmentIds?: string[]
+  /** Segment IDs to exclude from audience */
+  excludeSegmentIds?: string[]
+  /** SES Configuration Set for tracking (open/click/bounce) */
+  configurationSetName?: string
+  /** Whether to inject tracking pixel (1×1) for opens */
+  enableOpenTracking?: boolean
+  /** Whether to rewrite links for click tracking */
+  enableClickTracking?: boolean
+  /** Base URL for tracking (open pixel + link redirect) */
+  trackingBaseUrl?: string
   /** Campaign status */
   status: CampaignStatus
   /** ISO date when campaign is scheduled to be sent */
@@ -72,6 +84,12 @@ export interface CampaignFormData {
   senderName?: string
   replyTo?: string
   recipientTags: string[]
+  segmentIds?: string[]
+  excludeSegmentIds?: string[]
+  configurationSetName?: string
+  enableOpenTracking?: boolean
+  enableClickTracking?: boolean
+  trackingBaseUrl?: string
   scheduledAt?: string
 }
 

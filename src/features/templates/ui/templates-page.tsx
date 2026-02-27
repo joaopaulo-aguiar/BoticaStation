@@ -64,6 +64,8 @@ import {
   FileCode,
   ArrowUpDown,
   Info,
+  PanelLeftOpen,
+  PanelLeftClose,
 } from 'lucide-react'
 import { toSesTemplateName } from '@/features/settings/api/config-api'
 
@@ -140,6 +142,7 @@ export function TemplatesPage() {
   // ── Layout state ─────────────────────────────────────────────────────────
   const [editorWidth, setEditorWidth] = useState(50)
   const [isDragging, setIsDragging] = useState(false)
+  const [sidebarExpanded, setSidebarExpanded] = useState(true)
 
   // ── Dialog state ─────────────────────────────────────────────────────────
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -353,11 +356,14 @@ export function TemplatesPage() {
     if (mode === 'new' && !templateDisplayName.trim()) return
     if (!templateSubject.trim()) return
 
+    // Auto-generate plain text from HTML
+    const autoText = htmlToPlainText(templateHtml)
+
     const testData = safeParseJsonObject(testDataJson)
     const data = {
       subject: templateSubject,
       html: templateHtml,
-      text: templateText || undefined,
+      text: autoText || undefined,
       testData: Object.keys(testData).length > 0 ? testData : undefined,
     }
 
@@ -441,10 +447,6 @@ export function TemplatesPage() {
         },
       },
     )
-  }
-
-  const handleGenerateText = () => {
-    setTemplateText(htmlToPlainText(templateHtml))
   }
 
   const handleUploadHtml = () => {
@@ -536,79 +538,118 @@ export function TemplatesPage() {
       {/* ── Main content (sidebar + editor) ──────────────────────────────── */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* ── Sidebar ──────────────────────────────────────────────────── */}
-        <aside className="hidden md:flex flex-col w-60 border-r border-slate-200 bg-white">
-          {/* Search */}
-          <div className="p-3 border-b border-slate-100">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-              <Input
-                placeholder="Buscar template..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-8 h-8 text-xs"
-              />
-            </div>
-            <button
-              onClick={cycleSortMode}
-              className="flex items-center gap-1 mt-2 text-[10px] text-slate-500 hover:text-botica-600 cursor-pointer transition-colors"
-              title="Clique para alternar a ordenação"
-            >
-              <ArrowUpDown className="w-3 h-3" />
-              Ordenar: {sortLabel}
-            </button>
-          </div>
-
-          {/* Template list */}
-          <div className="flex-1 overflow-y-auto">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-5 h-5 animate-spin text-botica-600" />
-              </div>
-            ) : error ? (
-              <div className="flex items-center gap-2 px-3 py-4">
-                <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                <span className="text-xs text-red-600">Erro ao carregar</span>
-              </div>
-            ) : filteredTemplates.length === 0 ? (
-              <p className="text-center text-xs text-slate-400 py-8">
-                {search ? 'Nenhum resultado.' : 'Nenhum template.'}
-              </p>
-            ) : (
-              <div className="py-1">
-                {filteredTemplates.map((t) => (
-                  <div
-                    key={t.name}
-                    className={`group flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors text-sm ${
-                      selectedTemplateName === t.name
-                        ? 'bg-botica-50 text-botica-700 border-r-2 border-botica-600'
-                        : 'text-slate-700 hover:bg-slate-50'
-                    }`}
-                    onClick={() => handleSelectTemplate(t.name)}
-                    title={`${t.displayName}\nSES: ${t.name}${t.createdAt ? '\nCriado: ' + new Date(t.createdAt).toLocaleDateString('pt-BR') : ''}${t.updatedAt ? '\nAtualizado: ' + new Date(t.updatedAt).toLocaleDateString('pt-BR') : ''}`}
-                  >
-                    <FileCode className="w-3.5 h-3.5 flex-shrink-0 opacity-50" />
-                    <div className="flex-1 min-w-0">
-                      <span className="block truncate text-xs font-medium">{t.displayName}</span>
-                      {t.displayName !== t.name && (
-                        <span className="block truncate text-[10px] text-slate-400 font-mono">{t.name}</span>
-                      )}
-                    </div>
-                    <button
-                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-slate-200 cursor-pointer"
-                      onClick={(e) => handleContextMenu(e, t.name)}
-                    >
-                      <MoreVertical className="w-3.5 h-3.5 text-slate-400" />
-                    </button>
+        <aside
+          className={`hidden md:flex flex-col border-r border-slate-200 bg-white transition-all duration-200 ${
+            sidebarExpanded ? 'w-[480px]' : 'w-12'
+          }`}
+        >
+          {sidebarExpanded ? (
+            <>
+              {/* Search & sort */}
+              <div className="p-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                    <Input
+                      placeholder="Buscar template..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="pl-8 h-8 text-xs"
+                    />
                   </div>
-                ))}
+                  <button
+                    onClick={() => setSidebarExpanded(false)}
+                    className="p-1.5 rounded hover:bg-slate-100 text-slate-400 cursor-pointer"
+                    title="Recolher painel"
+                  >
+                    <PanelLeftClose className="w-4 h-4" />
+                  </button>
+                </div>
+                <button
+                  onClick={cycleSortMode}
+                  className="flex items-center gap-1 mt-2 text-[10px] text-slate-500 hover:text-botica-600 cursor-pointer transition-colors"
+                  title="Clique para alternar a ordenação"
+                >
+                  <ArrowUpDown className="w-3 h-3" />
+                  Ordenar: {sortLabel}
+                </button>
               </div>
-            )}
-          </div>
 
-          {/* Count footer */}
-          <div className="px-3 py-2 border-t border-slate-100 text-xs text-slate-400">
-            {templates?.length ?? 0} template{(templates?.length ?? 0) !== 1 ? 's' : ''}
-          </div>
+              {/* Template list */}
+              <div className="flex-1 overflow-y-auto">
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-5 h-5 animate-spin text-botica-600" />
+                  </div>
+                ) : error ? (
+                  <div className="flex items-center gap-2 px-3 py-4">
+                    <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                    <span className="text-xs text-red-600">Erro ao carregar</span>
+                  </div>
+                ) : filteredTemplates.length === 0 ? (
+                  <p className="text-center text-xs text-slate-400 py-8">
+                    {search ? 'Nenhum resultado.' : 'Nenhum template.'}
+                  </p>
+                ) : (
+                  <div className="py-1">
+                    {filteredTemplates.map((t) => (
+                      <div
+                        key={t.name}
+                        className={`group flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors text-sm ${
+                          selectedTemplateName === t.name
+                            ? 'bg-botica-50 text-botica-700 border-r-2 border-botica-600'
+                            : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                        onClick={() => handleSelectTemplate(t.name)}
+                        title={`${t.displayName}${t.createdAt ? '\nCriado: ' + new Date(t.createdAt).toLocaleDateString('pt-BR') : ''}${t.updatedAt ? '\nAtualizado: ' + new Date(t.updatedAt).toLocaleDateString('pt-BR') : ''}`}
+                      >
+                        <FileCode className="w-3.5 h-3.5 flex-shrink-0 opacity-50" />
+                        <div className="flex-1 min-w-0">
+                          <span className="block truncate text-xs font-medium">{t.displayName}</span>
+                          <span className="block truncate text-[10px] text-slate-400 font-mono">{t.name}</span>
+                        </div>
+                        {t.updatedAt && (
+                          <span className="text-[10px] text-slate-400 flex-shrink-0">
+                            {new Date(t.updatedAt).toLocaleDateString('pt-BR')}
+                          </span>
+                        )}
+                        <button
+                          className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-slate-200 cursor-pointer"
+                          onClick={(e) => handleContextMenu(e, t.name)}
+                        >
+                          <MoreVertical className="w-3.5 h-3.5 text-slate-400" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Count footer */}
+              <div className="px-3 py-2 border-t border-slate-100 text-xs text-slate-400">
+                {templates?.length ?? 0} template{(templates?.length ?? 0) !== 1 ? 's' : ''}
+              </div>
+            </>
+          ) : (
+            /* ── Collapsed sidebar: only expand button + selected template icon ── */
+            <div className="flex flex-col items-center py-2 gap-2">
+              <button
+                onClick={() => setSidebarExpanded(true)}
+                className="p-1.5 rounded hover:bg-slate-100 text-slate-400 cursor-pointer"
+                title="Expandir painel de templates"
+              >
+                <PanelLeftOpen className="w-4 h-4" />
+              </button>
+              {selectedTemplateName && (
+                <div
+                  className="p-1.5 rounded bg-botica-50 text-botica-600"
+                  title={templates?.find((t) => t.name === selectedTemplateName)?.displayName ?? selectedTemplateName}
+                >
+                  <FileCode className="w-4 h-4" />
+                </div>
+              )}
+            </div>
+          )}
         </aside>
 
         {/* ── Main panel ───────────────────────────────────────────────── */}
@@ -668,28 +709,16 @@ export function TemplatesPage() {
                 {/* Template name */}
                 <div className="flex items-center gap-1.5">
                   <Label className="text-xs text-slate-500 whitespace-nowrap">Nome:</Label>
-                  <div className="relative group">
-                    <Input
-                      value={templateDisplayName}
-                      onChange={(e) => setTemplateDisplayName(e.target.value)}
-                      placeholder="Nome do template (ex: Promo | Black Friday)"
-                      className="h-7 text-xs w-52"
-                    />
-                    {templateDisplayName && (
-                      <div className="absolute left-0 top-full mt-1 z-50 hidden group-hover:block bg-slate-800 text-white text-[10px] px-2 py-1 rounded shadow-lg font-mono whitespace-nowrap">
-                        SES: {mode === 'new' ? toSesTemplateName(templateDisplayName) : templateSesName}
-                      </div>
-                    )}
-                  </div>
-                  {mode === 'edit' && templateSesName && (
-                    <span className="text-[10px] text-slate-400 font-mono truncate max-w-32 hidden lg:inline" title={`Identificador SES: ${templateSesName}`}>
-                      <Info className="w-3 h-3 inline mr-0.5" />{templateSesName}
-                    </span>
-                  )}
+                  <Input
+                    value={templateDisplayName}
+                    onChange={(e) => setTemplateDisplayName(e.target.value)}
+                    placeholder="Nome do template (ex: Promo | Black Friday | 25-02-26)"
+                    className="h-7 text-xs w-[420px]"
+                  />
                 </div>
 
                 {/* Subject */}
-                <div className="flex items-center gap-1.5 flex-1 min-w-[200px]">
+                <div className="flex items-center gap-1.5 flex-1 min-w-[160px]">
                   <Label className="text-xs text-slate-500 whitespace-nowrap">Subject:</Label>
                   <Input
                     value={templateSubject}
@@ -718,15 +747,6 @@ export function TemplatesPage() {
                     title="Download JSON"
                   >
                     <Download className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={handleGenerateText}
-                    title="Gerar texto plano do HTML"
-                  >
-                    <FileText className="w-3.5 h-3.5" />
                   </Button>
                   <Button
                     variant="outline"

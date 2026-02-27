@@ -5,6 +5,7 @@ import {
 } from '@/features/contacts/hooks/use-contacts'
 import { ContactFormDialog } from './contact-form-dialog'
 import { ImportCSVDialog } from './import-csv-dialog'
+import { EmailActivityDialog } from './email-activity-dialog'
 import {
   Table,
   TableHeader,
@@ -25,6 +26,7 @@ import {
   Loader2,
   Users,
   AlertCircle,
+  Mail,
 } from 'lucide-react'
 import { formatPhone, formatCurrency } from '@/shared/lib/utils'
 import type { Contact } from '@/shared/types'
@@ -43,6 +45,9 @@ export function ContactsPage() {
   const [formDialogOpen, setFormDialogOpen] = useState(false)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [editingContact, setEditingContact] = useState<Contact | null>(null)
+  const [activityEmail, setActivityEmail] = useState<string | null>(null)
+  const [activityContactName, setActivityContactName] = useState<string | undefined>()
+  const [activityDialogOpen, setActivityDialogOpen] = useState(false)
 
   const filtered = (contacts ?? []).filter((c) => {
     const q = search.toLowerCase()
@@ -67,6 +72,12 @@ export function ContactsPage() {
   const handleNewContact = () => {
     setEditingContact(null)
     setFormDialogOpen(true)
+  }
+
+  const handleOpenActivity = (contact: Contact) => {
+    setActivityEmail(contact.email)
+    setActivityContactName(contact.full_name)
+    setActivityDialogOpen(true)
   }
 
   return (
@@ -200,6 +211,15 @@ export function ContactsPage() {
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7"
+                        onClick={() => handleOpenActivity(contact)}
+                        title="Atividade de E-mail"
+                      >
+                        <Mail className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
                         onClick={() => handleEdit(contact)}
                         title="Editar"
                       >
@@ -231,6 +251,12 @@ export function ContactsPage() {
         contact={editingContact}
       />
       <ImportCSVDialog open={importDialogOpen} onOpenChange={setImportDialogOpen} />
+      <EmailActivityDialog
+        open={activityDialogOpen}
+        onOpenChange={setActivityDialogOpen}
+        email={activityEmail}
+        contactName={activityContactName}
+      />
     </div>
   )
 }

@@ -76,6 +76,8 @@ export function SettingsPage() {
     addSenderProfile,
     updateSenderProfile,
     removeSenderProfile,
+    setDefaultConfigurationSet,
+    updateEventBridge,
     resetToDefaults,
   } = useSettingsStore()
 
@@ -88,6 +90,14 @@ export function SettingsPage() {
   const [tableName, setTableName] = useState(settings.campaignAnalyticsTable.tableName)
   const [tableRegion, setTableRegion] = useState(settings.campaignAnalyticsTable.region)
   const [tableSaved, setTableSaved] = useState(false)
+
+  // ── EventBridge config ───────────────────────────────────────────────
+  const [ebEnabled, setEbEnabled] = useState(settings.eventBridge.enabled)
+  const [ebRegion, setEbRegion] = useState(settings.eventBridge.region)
+  const [ebRoleArn, setEbRoleArn] = useState(settings.eventBridge.roleArn)
+  const [ebTargetLambdaArn, setEbTargetLambdaArn] = useState(settings.eventBridge.targetLambdaArn)
+  const [ebScheduleGroup, setEbScheduleGroup] = useState(settings.eventBridge.scheduleGroupName)
+  const [ebSaved, setEbSaved] = useState(false)
 
   // ── SES Identities ──────────────────────────────────────────────────
   const {
@@ -123,6 +133,11 @@ export function SettingsPage() {
     setS3Region(settings.s3Bucket.region)
     setTableName(settings.campaignAnalyticsTable.tableName)
     setTableRegion(settings.campaignAnalyticsTable.region)
+    setEbEnabled(settings.eventBridge.enabled)
+    setEbRegion(settings.eventBridge.region)
+    setEbRoleArn(settings.eventBridge.roleArn)
+    setEbTargetLambdaArn(settings.eventBridge.targetLambdaArn)
+    setEbScheduleGroup(settings.eventBridge.scheduleGroupName)
   }, [settings])
 
   // ── Handlers ─────────────────────────────────────────────────────────
@@ -145,6 +160,18 @@ export function SettingsPage() {
     updateCampaignTable(config)
     setTableSaved(true)
     setTimeout(() => setTableSaved(false), 2000)
+  }
+
+  const handleSaveEventBridge = () => {
+    updateEventBridge({
+      enabled: ebEnabled,
+      region: ebRegion.trim() || 'sa-east-1',
+      roleArn: ebRoleArn.trim(),
+      targetLambdaArn: ebTargetLambdaArn.trim(),
+      scheduleGroupName: ebScheduleGroup.trim() || 'botica-station',
+    })
+    setEbSaved(true)
+    setTimeout(() => setEbSaved(false), 2000)
   }
 
   const handleReset = () => {
@@ -615,15 +642,45 @@ export function SettingsPage() {
                   </p>
                 </div>
               </div>
-              <div className="p-5">
-                <div className="flex flex-wrap gap-2">
+              <div className="p-5 space-y-4">
+                <div>
+                  <Label className="text-xs font-medium text-slate-700 mb-2 block">
+                    Configuration Set Padrão
+                  </Label>
+                  <select
+                    value={settings.ses.defaultConfigurationSet || ''}
+                    onChange={(e) => setDefaultConfigurationSet(e.target.value || undefined)}
+                    className="flex h-9 w-full max-w-sm rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-botica-500"
+                  >
+                    <option value="">Nenhum (padrão da conta)</option>
+                    {configSets.map((cs) => (
+                      <option key={cs.name} value={cs.name}>
+                        {cs.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Este configuration set será usado em todos os envios de e-mail (campanhas e testes).
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mr-2 self-center">
+                    Disponíveis:
+                  </span>
                   {configSets.map((cs) => (
                     <span
                       key={cs.name}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-purple-50 text-purple-700 font-medium"
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
+                        settings.ses.defaultConfigurationSet === cs.name
+                          ? 'bg-botica-100 text-botica-700 ring-1 ring-botica-300'
+                          : 'bg-purple-50 text-purple-700'
+                      }`}
                     >
                       <Layers className="w-3 h-3" />
                       {cs.name}
+                      {settings.ses.defaultConfigurationSet === cs.name && (
+                        <Star className="w-3 h-3" />
+                      )}
                     </span>
                   ))}
                 </div>
@@ -951,6 +1008,110 @@ export function SettingsPage() {
               integrações. As configurações acima definem apenas os recursos (buckets, tabelas e
               identidades SES) que o sistema utiliza.
             </p>
+          </div>
+
+          {/* ── EventBridge Scheduler ─────────────────────────────────── */}
+          <div className="bg-white rounded-lg border border-slate-200 shadow-[var(--shadow-card)]">
+            <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100">
+              <div className="flex items-center justify-center w-8 h-8 rounded-md bg-purple-100 text-purple-700">
+                <Activity className="w-4 h-4" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-sm font-semibold text-slate-900">AWS EventBridge Scheduler</h2>
+                <p className="text-xs text-slate-500">
+                  Agendamento de campanhas e automações via EventBridge Scheduler
+                </p>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={ebEnabled}
+                  onChange={(e) => setEbEnabled(e.target.checked)}
+                  className="rounded border-slate-300"
+                />
+                <span className="text-xs font-medium text-slate-700">Ativado</span>
+              </label>
+            </div>
+
+            {ebEnabled && (
+              <div className="p-5 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-xs font-medium text-slate-700">Região</Label>
+                    <select
+                      value={ebRegion}
+                      onChange={(e) => setEbRegion(e.target.value)}
+                      className="flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm shadow-sm mt-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-botica-500"
+                    >
+                      {AWS_REGIONS.map((r) => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <Label className="text-xs font-medium text-slate-700">Schedule Group</Label>
+                    <Input
+                      value={ebScheduleGroup}
+                      onChange={(e) => setEbScheduleGroup(e.target.value)}
+                      placeholder="botica-station"
+                      className="mt-1 font-mono text-xs"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Grupo do EventBridge Scheduler (criado automaticamente se não existir)
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-xs font-medium text-slate-700">IAM Role ARN</Label>
+                  <Input
+                    value={ebRoleArn}
+                    onChange={(e) => setEbRoleArn(e.target.value)}
+                    placeholder="arn:aws:iam::123456789012:role/eventbridge-scheduler-role"
+                    className="mt-1 font-mono text-xs"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Role que o EventBridge Scheduler assume para invocar o target Lambda. Deve ter permissão lambda:InvokeFunction.
+                  </p>
+                </div>
+
+                <div>
+                  <Label className="text-xs font-medium text-slate-700">Target Lambda ARN</Label>
+                  <Input
+                    value={ebTargetLambdaArn}
+                    onChange={(e) => setEbTargetLambdaArn(e.target.value)}
+                    placeholder="arn:aws:lambda:sa-east-1:123456789012:function:send-campaign"
+                    className="mt-1 font-mono text-xs"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Lambda que será invocada pelo EventBridge no horário agendado para processar o envio da campanha.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                  <div className="text-xs text-slate-400">
+                    {ebRoleArn && ebTargetLambdaArn ? (
+                      <span className="text-green-600">✓ Configuração completa</span>
+                    ) : (
+                      <span className="text-amber-500">⚠ Preencha o Role ARN e o Target Lambda ARN</span>
+                    )}
+                  </div>
+                  <Button size="sm" onClick={handleSaveEventBridge}>
+                    {ebSaved ? (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-green-100" />
+                        Salvo
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-3.5 h-3.5" />
+                        Salvar
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

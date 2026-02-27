@@ -17,7 +17,7 @@ export interface Contact {
   created_at: string
   updated_at?: string
   source: string
-  status?: 'active' | 'inactive'
+  status?: 'active' | 'inactive' | 'bounced' | 'unsubscribed' | 'complained'
   lead_score?: number
   opt_in_email?: boolean
   opt_in_sms?: boolean
@@ -31,6 +31,10 @@ export interface ContactFormData {
   lifecycle_stage: 'customer' | 'subscriber' | 'lead'
   cashback_balance: number
   tags: string[]
+  status?: 'active' | 'inactive' | 'bounced' | 'unsubscribed' | 'complained'
+  opt_in_email?: boolean
+  opt_in_sms?: boolean
+  custom_fields?: Record<string, string>
 }
 
 export interface AWSSessionCredentials {

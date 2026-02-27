@@ -11,6 +11,8 @@ import {
   FileText,
   LayoutDashboard,
   X,
+  ListFilter,
+  Workflow,
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/shared/lib/utils'
@@ -18,6 +20,8 @@ import { cn } from '@/shared/lib/utils'
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Contatos', href: '/contacts', icon: Users },
+  { name: 'Segmentação', href: '/segmentation', icon: ListFilter },
+  { name: 'Automações', href: '/automations', icon: Workflow },
   { name: 'Campanhas', href: '/campaigns', icon: Send },
   { name: 'Templates', href: '/templates', icon: FileText },
   { name: 'Cashback', href: '/cashback', icon: Wallet },

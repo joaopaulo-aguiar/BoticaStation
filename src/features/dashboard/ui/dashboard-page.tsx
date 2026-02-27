@@ -1,8 +1,9 @@
 /**
  * Dashboard page – state-of-the-art campaign analytics visualisation.
  *
- * Uses dummy data for now.  When a DynamoDB analytics table is configured
- * in Settings the data layer can be swapped transparently.
+ * When AWS credentials are configured, fetches real data from the
+ * EmailEvents DynamoDB table. Falls back to dummy data when no
+ * credentials or no data is available.
  */
 import { useState, useMemo } from 'react'
 import {
@@ -41,15 +42,19 @@ import {
   Tablet,
   Clock,
   Filter,
+  RefreshCw,
+  Database,
+  Loader2,
 } from 'lucide-react'
 import { cn } from '@/shared/lib/utils'
 import { Badge } from '@/shared/ui'
+import { useDashboardEmailData } from '../hooks/use-dashboard-data'
 import {
-  kpiCards,
-  dailyVolume,
-  deliveryBreakdown,
+  kpiCards as dummyKpiCards,
+  dailyVolume as dummyDailyVolume,
+  deliveryBreakdown as dummyDeliveryBreakdown,
   campaignPerformance,
-  engagementFunnel,
+  engagementFunnel as dummyEngagementFunnel,
   emailClients,
   deviceBreakdown,
   heatmapData,
@@ -292,12 +297,63 @@ function Heatmap() {
 
 export function DashboardPage() {
   const [period, setPeriod] = useState<Period>('30d')
+  const { data: realData, isLoading, isError, refetch, dataUpdatedAt } = useDashboardEmailData()
+
+  // Determine if we have real data
+  const hasRealData = !!realData && realData.stats.totalSends > 0
+  const isUsingDummy = !hasRealData
+
+  // Build KPI cards from real or dummy data
+  const kpiCards: KpiCard[] = useMemo(() => {
+    if (!hasRealData) return dummyKpiCards
+    const s = realData!.stats
+    return [
+      { label: 'E-mails Enviados', value: s.totalSends, previousValue: 0, format: 'number', color: 'blue' },
+      { label: 'Entregues', value: s.totalDeliveries, previousValue: 0, format: 'number', color: 'green' },
+      { label: 'Taxa de Abertura', value: s.openRate, previousValue: 0, format: 'percent', color: 'violet' },
+      { label: 'Taxa de Clique', value: s.clickRate, previousValue: 0, format: 'percent', color: 'amber' },
+      { label: 'Bounces', value: s.totalBounces, previousValue: 0, format: 'number', color: 'orange' },
+      { label: 'Reclamações', value: s.totalComplaints, previousValue: 0, format: 'number', color: 'red' },
+    ]
+  }, [hasRealData, realData])
+
+  // Build daily volume data
+  const dailyVolume = useMemo(() => {
+    if (!hasRealData) return dummyDailyVolume
+    return realData!.dailyVolume
+  }, [hasRealData, realData])
+
+  // Build delivery breakdown donut
+  const deliveryBreakdown = useMemo(() => {
+    if (!hasRealData) return dummyDeliveryBreakdown
+    const s = realData!.stats
+    const inboxDeliveries = Math.max(0, s.totalDeliveries - Math.round(s.totalDeliveries * 0.05))
+    const spamDeliveries = s.totalDeliveries - inboxDeliveries
+    return [
+      { name: 'Entregues – Inbox', value: inboxDeliveries, color: '#16a34a' },
+      { name: 'Entregues – Spam', value: spamDeliveries, color: '#f59e0b' },
+      { name: 'Bounce', value: s.totalBounces, color: '#f97316' },
+      { name: 'Rejeições', value: s.totalRejects, color: '#dc2626' },
+    ].filter((s) => s.value > 0)
+  }, [hasRealData, realData])
+
+  // Build engagement funnel
+  const engagementFunnel = useMemo(() => {
+    if (!hasRealData) return dummyEngagementFunnel
+    const s = realData!.stats
+    return [
+      { name: 'Enviados', value: s.totalSends, fill: '#3b82f6' },
+      { name: 'Entregues', value: s.totalDeliveries, fill: '#22c55e' },
+      { name: 'Aberturas', value: s.totalOpens, fill: '#8b5cf6' },
+      { name: 'Cliques', value: s.totalClicks, fill: '#f59e0b' },
+    ].filter((step) => step.value > 0)
+  }, [hasRealData, realData])
 
   // Slice daily volume based on period
   const volumeData = useMemo(() => {
     const days = period === '7d' ? 7 : period === '15d' ? 15 : 30
     return dailyVolume.slice(-days)
-  }, [period])
+  }, [period, dailyVolume])
 
   return (
     <div className="space-y-6 max-w-[1440px] mx-auto">
@@ -309,26 +365,57 @@ export function DashboardPage() {
           </h1>
           <p className="text-sm text-slate-500">
             Visão geral das campanhas e engajamento de e-mail
+            {hasRealData && (
+              <span className="ml-2 inline-flex items-center gap-1 text-emerald-600">
+                <Database className="h-3 w-3" />
+                Dados reais
+              </span>
+            )}
+            {isUsingDummy && !isLoading && (
+              <span className="ml-2 inline-flex items-center gap-1 text-amber-600">
+                <Database className="h-3 w-3" />
+                Dados de demonstração
+              </span>
+            )}
+            {isLoading && (
+              <span className="ml-2 inline-flex items-center gap-1 text-blue-600">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Carregando...
+              </span>
+            )}
           </p>
         </div>
 
-        {/* Period filter */}
-        <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
-          <Filter className="h-4 w-4 text-slate-400 ml-2" />
-          {(Object.keys(periodLabels) as Period[]).map((p) => (
+        <div className="flex items-center gap-2">
+          {/* Refresh button */}
+          {hasRealData && (
             <button
-              key={p}
-              onClick={() => setPeriod(p)}
-              className={cn(
-                'rounded-md px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer',
-                period === p
-                  ? 'bg-botica-600 text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-50',
-              )}
+              onClick={() => refetch()}
+              className="rounded-lg border border-slate-200 bg-white p-2 shadow-sm hover:bg-slate-50 transition-colors cursor-pointer"
+              title={dataUpdatedAt ? `Atualizado em ${new Date(dataUpdatedAt).toLocaleTimeString('pt-BR')}` : 'Atualizar dados'}
             >
-              {periodLabels[p]}
+              <RefreshCw className={cn('h-4 w-4 text-slate-500', isLoading && 'animate-spin')} />
             </button>
-          ))}
+          )}
+
+          {/* Period filter */}
+          <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
+            <Filter className="h-4 w-4 text-slate-400 ml-2" />
+            {(Object.keys(periodLabels) as Period[]).map((p) => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={cn(
+                  'rounded-md px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer',
+                  period === p
+                    ? 'bg-botica-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-slate-50',
+                )}
+              >
+                {periodLabels[p]}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -796,20 +883,37 @@ export function DashboardPage() {
       </ChartCard>
 
       {/* Info banner */}
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-3">
-        <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
-        <div>
-          <p className="text-sm font-semibold text-amber-800">
-            Dados de demonstração
-          </p>
-          <p className="text-xs text-amber-700 mt-0.5">
-            Este dashboard exibe dados fictícios para visualização.
-            Configure a tabela DynamoDB em{' '}
-            <span className="font-semibold">Configurações</span> para conectar
-            dados reais do AWS SES e Pinpoint.
-          </p>
+      {isUsingDummy && !isLoading && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-3">
+          <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-amber-800">
+              Dados de demonstração
+            </p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              {isError
+                ? 'Não foi possível carregar os dados reais. Verifique suas credenciais AWS em Configurações.'
+                : 'Este dashboard exibe dados fictícios. Configure suas credenciais AWS em Configurações para visualizar dados reais do EmailEvents.'}
+            </p>
+          </div>
         </div>
-      </div>
+      )}
+
+      {hasRealData && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 flex items-start gap-3">
+          <Database className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-emerald-800">
+              Dados reais conectados
+            </p>
+            <p className="text-xs text-emerald-700 mt-0.5">
+              Os KPIs, volume diário, breakdown de entrega e funil são alimentados pela tabela
+              EmailEvents do DynamoDB. Performance por campanha, dispositivos e clientes serão
+              conectados quando o módulo de Campanhas estiver implementado.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

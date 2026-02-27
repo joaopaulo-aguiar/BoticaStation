@@ -56,6 +56,7 @@ import {
   useRecipientsByTags,
 } from '../hooks/use-campaigns'
 import { useTemplates, useVerifiedIdentities } from '@/features/templates/hooks/use-templates'
+import { useSegments } from '@/features/segmentation/hooks/use-segments'
 import { CampaignStatsView } from './campaign-stats'
 import type { Campaign, CampaignFormData, CampaignStatus } from '../types'
 
@@ -119,6 +120,11 @@ export function CampaignsPage() {
   const [formRecipientTags, setFormRecipientTags] = useState<string[]>([])
   const [formTagInput, setFormTagInput] = useState('')
   const [formScheduledAt, setFormScheduledAt] = useState('')
+  const [formSegmentIds, setFormSegmentIds] = useState<string[]>([])
+  const [formExcludeSegmentIds, setFormExcludeSegmentIds] = useState<string[]>([])
+  const [formEnableOpenTracking, setFormEnableOpenTracking] = useState(true)
+  const [formEnableClickTracking, setFormEnableClickTracking] = useState(true)
+  const [formTrackingBaseUrl, setFormTrackingBaseUrl] = useState('')
   const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null)
 
   // ── Queries & Mutations ──────────────────────────────────────────────────
@@ -126,6 +132,7 @@ export function CampaignsPage() {
   const selectedCampaignQuery = useCampaign(selectedCampaignId)
   const { data: templates } = useTemplates()
   const { data: identities } = useVerifiedIdentities()
+  const { data: segments } = useSegments()
 
   const createMutation = useCreateCampaign()
   const updateMutation = useUpdateCampaign()
@@ -196,6 +203,11 @@ export function CampaignsPage() {
     setFormRecipientTags([])
     setFormTagInput('')
     setFormScheduledAt('')
+    setFormSegmentIds([])
+    setFormExcludeSegmentIds([])
+    setFormEnableOpenTracking(true)
+    setFormEnableClickTracking(true)
+    setFormTrackingBaseUrl('')
     setEditingCampaignId(null)
   }
 
@@ -213,6 +225,11 @@ export function CampaignsPage() {
     setFormReplyTo(c.replyTo || '')
     setFormRecipientTags(c.recipientTags)
     setFormScheduledAt(c.scheduledAt || '')
+    setFormSegmentIds(c.segmentIds ?? [])
+    setFormExcludeSegmentIds(c.excludeSegmentIds ?? [])
+    setFormEnableOpenTracking(c.enableOpenTracking ?? true)
+    setFormEnableClickTracking(c.enableClickTracking ?? true)
+    setFormTrackingBaseUrl(c.trackingBaseUrl ?? '')
     setEditingCampaignId(c.id)
     setView('edit')
   }
@@ -228,6 +245,11 @@ export function CampaignsPage() {
       senderName: formSenderName || undefined,
       replyTo: formReplyTo || undefined,
       recipientTags: formRecipientTags,
+      segmentIds: formSegmentIds.length > 0 ? formSegmentIds : undefined,
+      excludeSegmentIds: formExcludeSegmentIds.length > 0 ? formExcludeSegmentIds : undefined,
+      enableOpenTracking: formEnableOpenTracking,
+      enableClickTracking: formEnableClickTracking,
+      trackingBaseUrl: formTrackingBaseUrl || undefined,
       scheduledAt: formScheduledAt || undefined,
     }
 
@@ -350,7 +372,7 @@ export function CampaignsPage() {
           </button>
           <div>
             <h1 className="text-xl font-bold text-slate-900">
-              {view === 'create' ? 'Criar Email' : 'Editar Campanha'}
+              {view === 'create' ? 'Criar Campanha' : 'Editar Campanha'}
             </h1>
             <p className="text-xs text-slate-500">
               {view === 'create' ? 'Configure os detalhes da nova campanha' : `Editando: ${formName}`}
@@ -496,6 +518,144 @@ export function CampaignsPage() {
               </p>
             </div>
 
+            {/* Segment selection */}
+            <div>
+              <Label className="text-xs font-medium text-slate-700">
+                Segmentações (audiência)
+              </Label>
+              {segments && segments.length > 0 ? (
+                <>
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value && !formSegmentIds.includes(e.target.value)) {
+                        setFormSegmentIds([...formSegmentIds, e.target.value])
+                      }
+                    }}
+                    className="flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm shadow-sm mt-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-botica-500"
+                  >
+                    <option value="">Adicionar segmentação...</option>
+                    {segments.map((s) => (
+                      <option key={s.id} value={s.id} disabled={formSegmentIds.includes(s.id)}>
+                        {s.name} ({s.type === 'dynamic' ? 'Dinâmica' : 'Estática'} — {s.contactCount} contatos)
+                      </option>
+                    ))}
+                  </select>
+                  {formSegmentIds.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {formSegmentIds.map((segId) => {
+                        const seg = segments.find((s) => s.id === segId)
+                        return (
+                          <span
+                            key={segId}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-700"
+                          >
+                            {seg?.name ?? segId}
+                            <button
+                              onClick={() => setFormSegmentIds(formSegmentIds.filter((id) => id !== segId))}
+                              className="hover:text-red-600 cursor-pointer"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        )
+                      })}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-xs text-slate-400 mt-1">Nenhuma segmentação criada. Crie segmentações no menu "Segmentação".</p>
+              )}
+            </div>
+
+            {/* Exclude segments */}
+            {segments && segments.length > 0 && (
+              <div>
+                <Label className="text-xs font-medium text-slate-700">
+                  Excluir segmentações (opcional)
+                </Label>
+                <select
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value && !formExcludeSegmentIds.includes(e.target.value)) {
+                      setFormExcludeSegmentIds([...formExcludeSegmentIds, e.target.value])
+                    }
+                  }}
+                  className="flex h-9 w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm shadow-sm mt-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-botica-500"
+                >
+                  <option value="">Adicionar exclusão...</option>
+                  {segments.map((s) => (
+                    <option key={s.id} value={s.id} disabled={formExcludeSegmentIds.includes(s.id)}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+                {formExcludeSegmentIds.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {formExcludeSegmentIds.map((segId) => {
+                      const seg = segments.find((s) => s.id === segId)
+                      return (
+                        <span
+                          key={segId}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-600"
+                        >
+                          {seg?.name ?? segId}
+                          <button
+                            onClick={() => setFormExcludeSegmentIds(formExcludeSegmentIds.filter((id) => id !== segId))}
+                            className="hover:text-red-600 cursor-pointer"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Tracking options */}
+            <div className="border-t border-slate-100 pt-4">
+              <Label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Rastreamento
+              </Label>
+              <div className="space-y-3 mt-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formEnableOpenTracking}
+                    onChange={(e) => setFormEnableOpenTracking(e.target.checked)}
+                    className="rounded border-slate-300"
+                  />
+                  <span className="text-sm text-slate-700">Rastrear aberturas (pixel de rastreamento 1×1)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formEnableClickTracking}
+                    onChange={(e) => setFormEnableClickTracking(e.target.checked)}
+                    className="rounded border-slate-300"
+                  />
+                  <span className="text-sm text-slate-700">Rastrear cliques (reescrita de links)</span>
+                </label>
+
+                {(formEnableOpenTracking || formEnableClickTracking) && (
+                  <div>
+                    <Label className="text-xs font-medium text-slate-700">URL Base de Rastreamento</Label>
+                    <Input
+                      value={formTrackingBaseUrl}
+                      onChange={(e) => setFormTrackingBaseUrl(e.target.value)}
+                      placeholder="https://track.suafarmacia.com.br"
+                      className="mt-1"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      URL do servidor de rastreamento (API Gateway / CloudFront). Necessário para pixel de abertura e redirect de links.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Schedule */}
             <div>
               <Label className="text-xs font-medium text-slate-700">
@@ -552,8 +712,8 @@ export function CampaignsPage() {
           <Send className="w-5 h-5" />
         </div>
         <div className="flex-1">
-          <h1 className="text-xl font-bold text-slate-900">Email</h1>
-          <p className="text-xs text-slate-500">Gestão de campanhas de email marketing</p>
+          <h1 className="text-xl font-bold text-slate-900">Campanhas</h1>
+          <p className="text-xs text-slate-500">Gestão de campanhas de marketing</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isLoading}>
@@ -561,7 +721,7 @@ export function CampaignsPage() {
           </Button>
           <Button size="sm" onClick={handleCreateNew}>
             <Plus className="w-4 h-4" />
-            Criar Email
+            Criar Campanha
           </Button>
         </div>
       </div>
@@ -571,7 +731,7 @@ export function CampaignsPage() {
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input
-            placeholder="Buscar email..."
+            placeholder="Buscar campanha..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9 h-9"
@@ -651,7 +811,7 @@ export function CampaignsPage() {
             {activeTab === 'draft' && (
               <Button size="sm" className="mt-4" onClick={handleCreateNew}>
                 <Plus className="w-4 h-4" />
-                Criar Email
+                Criar Campanha
               </Button>
             )}
           </div>
@@ -661,7 +821,7 @@ export function CampaignsPage() {
               <thead>
                 <tr className="border-b border-slate-100">
                   <th className="text-left px-4 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider min-w-[280px]">
-                    Nome do Email
+                    Nome da Campanha
                   </th>
                   <th
                     className="text-left px-3 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider cursor-pointer hover:text-slate-600 whitespace-nowrap"

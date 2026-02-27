@@ -118,6 +118,12 @@ export async function createCampaign(
     senderName: data.senderName,
     replyTo: data.replyTo,
     recipientTags: data.recipientTags,
+    segmentIds: data.segmentIds ?? [],
+    excludeSegmentIds: data.excludeSegmentIds ?? [],
+    configurationSetName: data.configurationSetName,
+    enableOpenTracking: data.enableOpenTracking ?? false,
+    enableClickTracking: data.enableClickTracking ?? false,
+    trackingBaseUrl: data.trackingBaseUrl,
     status: data.scheduledAt ? 'scheduled' : 'draft',
     scheduledAt: data.scheduledAt,
     stats: { ...EMPTY },
@@ -153,6 +159,12 @@ export async function updateCampaign(
     ['#rp', 'recipientTags'],
     ['#st', 'status'],
     ['#sa', 'scheduledAt'],
+    ['#si', 'segmentIds'],
+    ['#esi', 'excludeSegmentIds'],
+    ['#csn', 'configurationSetName'],
+    ['#eot', 'enableOpenTracking'],
+    ['#ect', 'enableClickTracking'],
+    ['#tbu', 'trackingBaseUrl'],
   ]
 
   const attrMap: Record<string, string> = {
@@ -167,6 +179,12 @@ export async function updateCampaign(
     '#rp': 'recipientTags',
     '#st': 'status',
     '#sa': 'scheduledAt',
+    '#si': 'segmentIds',
+    '#esi': 'excludeSegmentIds',
+    '#csn': 'configurationSetName',
+    '#eot': 'enableOpenTracking',
+    '#ect': 'enableClickTracking',
+    '#tbu': 'trackingBaseUrl',
   }
 
   for (const [alias, key] of fields) {
@@ -221,7 +239,67 @@ export async function duplicateCampaign(
     senderName: original.senderName,
     replyTo: original.replyTo,
     recipientTags: original.recipientTags,
+    segmentIds: original.segmentIds,
+    excludeSegmentIds: original.excludeSegmentIds,
+    configurationSetName: original.configurationSetName,
+    enableOpenTracking: original.enableOpenTracking,
+    enableClickTracking: original.enableClickTracking,
+    trackingBaseUrl: original.trackingBaseUrl,
   })
+}
+
+// ─── Tracking helpers ────────────────────────────────────────────────────────
+
+/**
+ * Inject a 1×1 tracking pixel before </body> for open tracking.
+ */
+function injectTrackingPixel(html: string, baseUrl: string, campaignId: string, recipientEmail: string): string {
+  const pixelUrl = `${baseUrl}/track/open?cid=${encodeURIComponent(campaignId)}&email=${encodeURIComponent(recipientEmail)}`
+  const pixel = `<img src="${pixelUrl}" width="1" height="1" alt="" style="display:none;width:1px;height:1px;border:0;" />`
+
+  if (html.includes('</body>')) {
+    return html.replace('</body>', `${pixel}</body>`)
+  }
+  return html + pixel
+}
+
+/**
+ * Rewrite all <a href="..."> links to pass through a click-tracking redirect.
+ */
+function rewriteLinksForTracking(html: string, baseUrl: string, campaignId: string, recipientEmail: string): string {
+  return html.replace(
+    /<a\s([^>]*?)href="([^"]+)"([^>]*)>/gi,
+    (_match, before, href, after) => {
+      // Don't rewrite mailto: or tel: links, or anchors or unsubscribe
+      if (/^(mailto:|tel:|#|{{)/i.test(href)) return _match
+      const redirectUrl = `${baseUrl}/track/click?cid=${encodeURIComponent(campaignId)}&email=${encodeURIComponent(recipientEmail)}&url=${encodeURIComponent(href)}`
+      return `<a ${before}href="${redirectUrl}"${after}>`
+    },
+  )
+}
+
+/**
+ * Apply tracking instrumentation to HTML body.
+ */
+function instrumentHtml(
+  html: string,
+  campaign: Campaign,
+  recipientEmail: string,
+): string {
+  if (!html) return html
+  let result = html
+
+  const baseUrl = campaign.trackingBaseUrl || ''
+
+  if (campaign.enableOpenTracking && baseUrl) {
+    result = injectTrackingPixel(result, baseUrl, campaign.id, recipientEmail)
+  }
+
+  if (campaign.enableClickTracking && baseUrl) {
+    result = rewriteLinksForTracking(result, baseUrl, campaign.id, recipientEmail)
+  }
+
+  return result
 }
 
 // ─── Sending ─────────────────────────────────────────────────────────────────
@@ -299,6 +377,8 @@ export async function sendCampaign(
     // ── Individual sending with raw HTML ──────────────────────────────
     for (const email of recipientEmails) {
       try {
+        const personalizedHtml = instrumentHtml(campaign.htmlBody ?? '', campaign, email)
+
         await ses.send(
           new SendEmailCommand({
             FromEmailAddress: fromAddr,
@@ -308,13 +388,16 @@ export async function sendCampaign(
               Simple: {
                 Subject: { Data: campaign.subject, Charset: 'UTF-8' },
                 Body: {
-                  Html: { Data: campaign.htmlBody ?? '', Charset: 'UTF-8' },
+                  Html: { Data: personalizedHtml, Charset: 'UTF-8' },
                   ...(campaign.textBody
                     ? { Text: { Data: campaign.textBody, Charset: 'UTF-8' } }
                     : {}),
                 },
               },
             },
+            ...(campaign.configurationSetName
+              ? { ConfigurationSetName: campaign.configurationSetName }
+              : {}),
           }),
         )
         sentCount++
@@ -386,4 +469,52 @@ export async function getRecipientsByTags(
     .filter((c) => c.tags?.some((t) => tags.includes(t)))
     .map((c) => c.email)
     .filter(Boolean)
+}
+
+/**
+ * Fetch recipient emails combining tags AND segment IDs.
+ * Merges tag-based + segment-based, removes excluded-segments, deduplicates.
+ */
+export async function getRecipientsByCriteria(
+  credentials: AWSSessionCredentials,
+  opts: {
+    tags?: string[]
+    segmentIds?: string[]
+    excludeSegmentIds?: string[]
+  },
+): Promise<string[]> {
+  const emails = new Set<string>()
+
+  // 1) Tag-based recipients
+  const tagEmails = await getRecipientsByTags(credentials, opts.tags ?? [])
+  for (const e of tagEmails) emails.add(e)
+
+  // 2) Segment-based recipients
+  if (opts.segmentIds?.length) {
+    // Import dynamically to avoid circular deps
+    const { getSegmentEmails } = await import('@/features/segmentation/api/segmentation-api')
+    for (const segId of opts.segmentIds) {
+      try {
+        const segEmails = await getSegmentEmails(credentials, segId)
+        for (const e of segEmails) emails.add(e)
+      } catch (err) {
+        console.warn(`Failed to resolve segment ${segId}:`, err)
+      }
+    }
+  }
+
+  // 3) Exclude segments
+  if (opts.excludeSegmentIds?.length) {
+    const { getSegmentEmails } = await import('@/features/segmentation/api/segmentation-api')
+    for (const segId of opts.excludeSegmentIds) {
+      try {
+        const segEmails = await getSegmentEmails(credentials, segId)
+        for (const e of segEmails) emails.delete(e)
+      } catch (err) {
+        console.warn(`Failed to resolve exclude segment ${segId}:`, err)
+      }
+    }
+  }
+
+  return Array.from(emails)
 }

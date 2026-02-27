@@ -414,6 +414,7 @@ export async function sendTestEmail(
   },
 ): Promise<{ success: boolean; messageId: string; message: string }> {
   const client = createSESv2Client(credentials)
+  const { ses } = useSettingsStore.getState().settings
 
   const response = await client.send(
     new SendEmailCommand({
@@ -428,6 +429,7 @@ export async function sendTestEmail(
           },
         },
       },
+      ...(ses.defaultConfigurationSet ? { ConfigurationSetName: ses.defaultConfigurationSet } : {}),
     }),
   )
 

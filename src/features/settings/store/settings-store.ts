@@ -31,12 +31,27 @@ export interface SenderProfile {
 export interface SesConfig {
   region: string
   senderProfiles: SenderProfile[]
+  defaultConfigurationSet?: string
+}
+
+export interface EventBridgeConfig {
+  /** Whether EventBridge scheduling is enabled */
+  enabled: boolean
+  /** AWS region for EventBridge Scheduler */
+  region: string
+  /** IAM Role ARN for EventBridge to assume when invoking targets */
+  roleArn: string
+  /** Target Lambda ARN that processes scheduled campaign sends */
+  targetLambdaArn: string
+  /** Schedule group name (optional) */
+  scheduleGroupName: string
 }
 
 export interface AppSettings {
   s3Bucket: S3BucketConfig
   campaignAnalyticsTable: DynamoTableConfig
   ses: SesConfig
+  eventBridge: EventBridgeConfig
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -51,6 +66,13 @@ const DEFAULT_SETTINGS: AppSettings = {
   ses: {
     region: 'sa-east-1',
     senderProfiles: [],
+  },
+  eventBridge: {
+    enabled: false,
+    region: 'sa-east-1',
+    roleArn: '',
+    targetLambdaArn: '',
+    scheduleGroupName: 'botica-station',
   },
 }
 
@@ -69,6 +91,10 @@ function loadSettings(): AppSettings {
         ...DEFAULT_SETTINGS.ses,
         ...parsed.ses,
         senderProfiles: parsed.ses?.senderProfiles ?? [],
+      },
+      eventBridge: {
+        ...DEFAULT_SETTINGS.eventBridge,
+        ...parsed.eventBridge,
       },
     }
   } catch {
@@ -98,9 +124,11 @@ interface SettingsState {
   updateS3Bucket: (config: S3BucketConfig) => void
   updateCampaignTable: (config: DynamoTableConfig) => void
   updateSesConfig: (config: Partial<SesConfig>) => void
+  setDefaultConfigurationSet: (name: string | undefined) => void
   addSenderProfile: (profile: SenderProfile) => void
   updateSenderProfile: (id: string, data: Partial<SenderProfile>) => void
   removeSenderProfile: (id: string) => void
+  updateEventBridge: (config: Partial<EventBridgeConfig>) => void
   resetToDefaults: () => void
 }
 
@@ -128,6 +156,17 @@ export const useSettingsStore = create<SettingsState>((set) => ({
       const next = {
         ...state.settings,
         ses: { ...state.settings.ses, ...config },
+      }
+      saveSettings(next)
+      return { settings: next }
+    })
+  },
+
+  setDefaultConfigurationSet: (name: string | undefined) => {
+    set((state) => {
+      const next = {
+        ...state.settings,
+        ses: { ...state.settings.ses, defaultConfigurationSet: name },
       }
       saveSettings(next)
       return { settings: next }
@@ -166,6 +205,17 @@ export const useSettingsStore = create<SettingsState>((set) => ({
       const next = {
         ...state.settings,
         ses: { ...state.settings.ses, senderProfiles: profiles },
+      }
+      saveSettings(next)
+      return { settings: next }
+    })
+  },
+
+  updateEventBridge: (config: Partial<EventBridgeConfig>) => {
+    set((state) => {
+      const next = {
+        ...state.settings,
+        eventBridge: { ...state.settings.eventBridge, ...config },
       }
       saveSettings(next)
       return { settings: next }

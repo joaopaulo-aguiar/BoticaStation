@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { LoginPage, ProtectedRoute } from '@/features/auth'
 import { ContactsPage } from '@/features/contacts'
+import { SegmentationPage } from '@/features/segmentation'
+import { AutomationsPage } from '@/features/automations'
 import { CampaignsPage } from '@/features/campaigns/ui/campaigns-page'
 import { CashbackPage } from '@/features/cashback/ui/cashback-page'
 import { ReportsPage } from '@/features/reports/ui/reports-page'
@@ -38,6 +40,8 @@ export function App() {
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/contacts" element={<ContactsPage />} />
+            <Route path="/segmentation" element={<SegmentationPage />} />
+            <Route path="/automations" element={<AutomationsPage />} />
             <Route path="/campaigns" element={<CampaignsPage />} />
             <Route path="/templates" element={<TemplatesPage />} />
             <Route path="/cashback" element={<CashbackPage />} />

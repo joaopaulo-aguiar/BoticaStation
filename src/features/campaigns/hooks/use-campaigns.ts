@@ -12,6 +12,7 @@ import {
   duplicateCampaign,
   sendCampaign,
   getRecipientsByTags,
+  getRecipientsByCriteria,
 } from '../api/campaigns-api'
 import type { CampaignFormData, Campaign } from '../types'
 
@@ -100,6 +101,20 @@ export function useRecipientsByTags(tags: string[], enabled = true) {
     queryKey: ['recipients', ...tags],
     queryFn: () => getRecipientsByTags(getCreds(), tags),
     enabled: enabled && tags.length > 0,
+    refetchOnWindowFocus: false,
+  })
+}
+
+export function useRecipientsByCriteria(
+  opts: { tags?: string[]; segmentIds?: string[]; excludeSegmentIds?: string[] },
+  enabled = true,
+) {
+  const getCreds = useCredentials()
+  const hasAnyCriteria = (opts.tags?.length ?? 0) > 0 || (opts.segmentIds?.length ?? 0) > 0
+  return useQuery({
+    queryKey: ['recipients-criteria', opts.tags, opts.segmentIds, opts.excludeSegmentIds],
+    queryFn: () => getRecipientsByCriteria(getCreds(), opts),
+    enabled: enabled && hasAnyCriteria,
     refetchOnWindowFocus: false,
   })
 }
