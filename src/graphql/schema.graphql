@@ -1,0 +1,176 @@
+# BoticaStation v0.37 — AppSync GraphQL Schema
+# Region: sa-east-1 | API ID: hs5qzjtrwrgctclh2rv7yp76lq
+# Auth: Cognito User Pool (sa-east-1_0ySBjVR2a)
+
+schema {
+	query: Query
+	mutation: Mutation
+}
+
+# ── Templates ─────────────────────────────────────────────────────────────────
+
+type TemplateSummary {
+	name: String!
+	displayName: String!
+	createdAt: AWSDateTime
+	updatedAt: AWSDateTime
+}
+
+type TemplateDetail {
+	name: String!
+	displayName: String!
+	subject: String!
+	html: String!
+	text: String!
+	testData: AWSJSON
+}
+
+type BackupVersion {
+	version: String!
+	key: String!
+	lastModified: AWSDateTime!
+	size: Int!
+}
+
+type SaveTemplateResult {
+	name: String!
+	updatedAt: AWSDateTime!
+}
+
+type DuplicateTemplateResult {
+	name: String!
+}
+
+type SendTestEmailResult {
+	messageId: String!
+}
+
+type VerifiedIdentity {
+	identity: String!
+	type: String!
+	sendingEnabled: Boolean!
+	verificationStatus: String!
+}
+
+input SaveTemplateInput {
+	name: String!
+	displayName: String!
+	subject: String!
+	html: String!
+	text: String!
+	testData: AWSJSON
+}
+
+# ── Contacts ──────────────────────────────────────────────────────────────────
+
+type CashbackInfo {
+	currentBalance: Float!
+	lifetimeEarned: Float!
+	expiryDate: String
+}
+
+type Contact {
+	id: ID!
+	email: String!
+	phone: String
+	fullName: String!
+	lifecycleStage: String!
+	cashbackInfo: CashbackInfo
+	tags: [String!]!
+	createdAt: AWSDateTime!
+	updatedAt: AWSDateTime
+	source: String!
+	status: String!
+	createdBy: String
+	updatedBy: String
+}
+
+type ContactListResult {
+	items: [Contact!]!
+	nextToken: String
+	totalCount: Int
+}
+
+type ImportResult {
+	success: Int!
+	failed: Int!
+	errors: [String!]
+}
+
+input CreateContactInput {
+	email: String!
+	phone: String
+	fullName: String!
+	lifecycleStage: String
+	cashbackBalance: Float
+	tags: [String!]
+	source: String
+}
+
+input UpdateContactInput {
+	fullName: String
+	email: String
+	phone: String
+	lifecycleStage: String
+	tags: [String!]
+	status: String
+}
+
+input ContactFilterInput {
+	lifecycleStage: String
+	status: String
+	tag: String
+	search: String
+}
+
+input ContactSortInput {
+	field: ContactSortField
+	direction: SortDirection
+}
+
+enum ContactSortField {
+	CREATED_AT
+	FULL_NAME
+	EMAIL
+	LIFECYCLE_STAGE
+}
+
+enum SortDirection {
+	ASC
+	DESC
+}
+
+# ── Queries ───────────────────────────────────────────────────────────────────
+
+type Query {
+	# Templates
+	listTemplates: [TemplateSummary!]!
+	getTemplate(name: String!): TemplateDetail!
+	listTemplateVersions(name: String!): [BackupVersion!]!
+	getTemplateVersion(name: String!, version: String!): TemplateDetail!
+	# Contacts
+	listContacts(pageSize: Int, nextToken: String, filter: ContactFilterInput, sort: ContactSortInput): ContactListResult!
+	getContact(id: ID!): Contact
+	findContactByEmail(email: String!): Contact
+	findContactByPhone(phone: String!): Contact
+	# SES / Settings
+	listVerifiedIdentities: [VerifiedIdentity!]!
+}
+
+# ── Mutations ─────────────────────────────────────────────────────────────────
+
+type Mutation {
+	# Templates
+	saveTemplate(input: SaveTemplateInput!): SaveTemplateResult!
+	deleteTemplate(name: String!): Boolean!
+	duplicateTemplate(sourceName: String!, newName: String!, newDisplayName: String!): DuplicateTemplateResult!
+	sendTestEmail(templateName: String!, toAddress: String!, testData: AWSJSON): SendTestEmailResult!
+	# Contacts
+	createContact(input: CreateContactInput!): Contact!
+	updateContact(id: ID!, input: UpdateContactInput!): Contact!
+	deleteContact(id: ID!): Boolean!
+	importContacts(inputs: [CreateContactInput!]!): ImportResult!
+	# SES / Settings
+	requestEmailVerification(email: String!): Boolean!
+	deleteVerifiedIdentity(identity: String!): Boolean!
+}
