@@ -18,6 +18,9 @@ export interface Contact {
   updatedAt: string | null
   source: string
   status: string
+  emailStatus: string | null
+  emailFailReason: string | null
+  phoneStatus: string | null
   createdBy: string | null
   updatedBy: string | null
 }
@@ -51,6 +54,8 @@ export interface UpdateContactInput {
   lifecycleStage?: string | null
   tags?: string[] | null
   status?: string | null
+  emailStatus?: string | null
+  phoneStatus?: string | null
 }
 
 export interface ContactFilterInput {
@@ -66,7 +71,23 @@ export interface ContactSortInput {
 }
 
 export type LifecycleStage = 'lead' | 'subscriber' | 'customer'
-export type ContactStatus = 'active' | 'inactive'
+export type ContactStatus = 'active' | 'inactive' | 'archived'
+
+export type EmailStatus = 'active' | 'bounced' | 'complained' | 'unsubscribed'
+export type PhoneStatus = 'active' | 'invalid' | 'unsubscribed'
+
+export const EMAIL_STATUSES: { value: EmailStatus; label: string; color: string }[] = [
+  { value: 'active', label: 'Ativo', color: 'bg-green-100 text-green-700' },
+  { value: 'bounced', label: 'Bounce', color: 'bg-red-100 text-red-700' },
+  { value: 'complained', label: 'Complaint', color: 'bg-red-100 text-red-700' },
+  { value: 'unsubscribed', label: 'Descadastrado', color: 'bg-slate-100 text-slate-600' },
+]
+
+export const PHONE_STATUSES: { value: PhoneStatus; label: string; color: string }[] = [
+  { value: 'active', label: 'Ativo', color: 'bg-green-100 text-green-700' },
+  { value: 'invalid', label: 'Inválido', color: 'bg-red-100 text-red-700' },
+  { value: 'unsubscribed', label: 'Descadastrado', color: 'bg-slate-100 text-slate-600' },
+]
 
 export const LIFECYCLE_STAGES: { value: LifecycleStage; label: string; color: string }[] = [
   { value: 'lead', label: 'Lead', color: 'bg-amber-100 text-amber-700' },

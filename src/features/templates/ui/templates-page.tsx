@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import {
   FileText, Plus, Search, Save, Send, Copy, Trash2, Eye, Code, EyeOff,
-  MoreVertical, RefreshCw, AlertCircle, Check, X, History,
+  MoreVertical, RefreshCw, AlertCircle, Check, History,
   Smartphone, Monitor, type LucideIcon, PanelLeftClose, PanelLeft,
 } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
@@ -70,15 +70,15 @@ function TemplateSidebar({
   }, [templates, search])
 
   return (
-    <aside className="w-72 border-r border-slate-200 bg-white flex flex-col shrink-0">
+    <aside className="w-[480px] border-r border-slate-200 bg-white flex flex-col shrink-0">
       {/* Header */}
       <div className="p-3 border-b border-slate-200">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-botica-600" />
             <div>
-              <h2 className="text-sm font-semibold text-slate-800">Templates de E-mail</h2>
-              <p className="text-[10px] text-slate-400">Gerenciamento de templates para campanhas</p>
+              <h2 className="text-sm font-semibold text-slate-800">E-mails</h2>
+              <p className="text-[10px] text-slate-400">Gerenciamento de e-mails para campanhas</p>
             </div>
           </div>
         </div>
@@ -86,7 +86,7 @@ function TemplateSidebar({
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
             <Input
-              placeholder="Buscar template..."
+              placeholder="Buscar e-mail..."
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
               className="pl-8 h-8 text-xs"
@@ -95,7 +95,7 @@ function TemplateSidebar({
           <Button variant="outline" size="icon" onClick={onRefresh} title="Atualizar" className="h-8 w-8 shrink-0">
             <RefreshCw className={cn('w-3.5 h-3.5', isLoading && 'animate-spin')} />
           </Button>
-          <Button size="icon" onClick={onNew} title="Novo Template" className="h-8 w-8 shrink-0">
+          <Button size="icon" onClick={onNew} title="Novo E-mail" className="h-8 w-8 shrink-0">
             <Plus className="w-3.5 h-3.5" />
           </Button>
         </div>
@@ -112,7 +112,7 @@ function TemplateSidebar({
           <div className="p-4 text-xs text-slate-400 text-center">Carregando...</div>
         ) : filtered.length === 0 ? (
           <div className="p-4 text-xs text-slate-400 text-center">
-            {search ? 'Nenhum resultado' : 'Nenhum template'}
+            {search ? 'Nenhum resultado' : 'Nenhum e-mail'}
           </div>
         ) : (
           filtered.map((t) => (
@@ -142,7 +142,7 @@ function TemplateSidebar({
 
       {/* Footer count */}
       <div className="px-3 py-1.5 border-t border-slate-100 text-[10px] text-slate-400">
-        {filtered.length} template{filtered.length !== 1 ? 's' : ''}
+        {filtered.length} e-mail{filtered.length !== 1 ? 's' : ''}
       </div>
     </aside>
   )
@@ -232,68 +232,6 @@ function PreviewFrame({
           device === 'mobile' ? 'w-[375px] h-[667px]' : 'w-full max-w-[800px] h-full min-h-[600px]',
         )}
       />
-    </div>
-  )
-}
-
-// ── Test Data Panel ──────────────────────────────────────────────────────────
-
-function TestDataPanel({
-  json,
-  onChange,
-  variables,
-  onClose,
-}: {
-  json: string
-  onChange: (json: string) => void
-  variables: string[]
-  onClose: () => void
-}) {
-  const [parseError, setParseError] = useState<string | null>(null)
-
-  const handleChange = useCallback(
-    (val: string) => {
-      onChange(val)
-      try {
-        JSON.parse(val)
-        setParseError(null)
-      } catch (e) {
-        setParseError(e instanceof Error ? e.message : 'JSON inválido')
-      }
-    },
-    [onChange],
-  )
-
-  return (
-    <div className="border-t border-slate-200 bg-white">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-slate-600">Dados de Teste (JSON)</span>
-          {parseError && (
-            <span className="text-[10px] text-red-500 flex items-center gap-1">
-              <AlertCircle className="w-3 h-3" /> {parseError}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-1">
-          {variables.length > 0 && (
-            <span className="text-[10px] text-slate-400">
-              Variáveis: {variables.join(', ')}
-            </span>
-          )}
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-6 w-6">
-            <X className="w-3 h-3" />
-          </Button>
-        </div>
-      </div>
-      <div className="h-32">
-        <CodeEditor
-          value={json}
-          onChange={handleChange}
-          language="json"
-          height="100%"
-        />
-      </div>
     </div>
   )
 }
@@ -478,7 +416,7 @@ export function TemplatesPage() {
         testData: testDataJson !== '{}' ? testDataJson : undefined,
       })
       setIsDirty(false)
-      showToast('Template salvo com sucesso!')
+      showToast('E-mail salvo com sucesso!')
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Erro ao salvar', 'error')
     }
@@ -500,9 +438,9 @@ export function TemplatesPage() {
       setNewTemplateName('')
       setNewTemplateDialog(false)
       setSelectedName(slug)
-      showToast('Template criado!')
+      showToast('E-mail criado!')
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Erro ao criar template', 'error')
+      showToast(err instanceof Error ? err.message : 'Erro ao criar e-mail', 'error')
     }
   }, [newTemplateName, saveTemplate, showToast])
 
@@ -518,7 +456,7 @@ export function TemplatesPage() {
       }
       setDeleteConfirmDialog(false)
       setDeleteTarget(null)
-      showToast('Template excluído')
+      showToast('E-mail excluído')
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Erro ao excluir', 'error')
     }
@@ -538,7 +476,7 @@ export function TemplatesPage() {
       setDuplicateDialog(false)
       setDuplicateNewName('')
       setDuplicateSource(null)
-      showToast('Template duplicado!')
+      showToast('E-mail duplicado!')
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Erro ao duplicar', 'error')
     }
@@ -624,18 +562,18 @@ export function TemplatesPage() {
           {hasTemplate ? (
             <>
               {/* Name (display name - read-only label) */}
-              <div className="flex items-center gap-1.5 shrink-0">
-                <span className="text-xs font-medium text-slate-500">Nome:</span>
-                <span className="text-xs font-semibold text-slate-700 max-w-[200px] truncate" title={displayName}>
+              <div className="flex items-center gap-1.5 min-w-0 shrink-0 max-w-[40%]">
+                <span className="text-xs font-medium text-slate-500 shrink-0">Nome:</span>
+                <span className="text-xs font-semibold text-slate-700 truncate" title={displayName}>
                   {displayName}
                 </span>
               </div>
 
-              <div className="w-px h-5 bg-slate-200" />
+              <div className="w-px h-5 bg-slate-200 shrink-0" />
 
               {/* Subject */}
-              <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                <span className="text-xs font-medium text-slate-500 shrink-0">Subject:</span>
+              <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                <span className="text-xs font-medium text-slate-500 shrink-0">Assunto:</span>
                 <Input
                   value={subject}
                   onChange={(e) => handleSubjectChange(e.target.value)}
@@ -750,7 +688,7 @@ export function TemplatesPage() {
           ) : (
             <div className="flex items-center gap-2 text-sm text-slate-400 flex-1">
               <FileText className="w-4 h-4" />
-              Selecione ou crie um template
+              Selecione ou crie um e-mail
             </div>
           )}
         </div>
@@ -759,12 +697,33 @@ export function TemplatesPage() {
         {hasTemplate ? (
           <div className="flex-1 flex flex-col min-h-0">
             <div className="flex-1 flex min-h-0">
-              {/* Code Editor */}
+              {/* Code Editor / Test Data (same panel, toggled) */}
               {(viewMode === 'code' || viewMode === 'split') && (
                 <div className={cn('flex flex-col min-h-0', viewMode === 'split' ? 'w-1/2 border-r border-slate-200' : 'flex-1')}>
                   {isDetailLoading ? (
                     <div className="flex-1 flex items-center justify-center bg-[#1e1e1e] text-slate-400 text-sm">
-                      <RefreshCw className="w-4 h-4 animate-spin mr-2" /> Carregando template...
+                      <RefreshCw className="w-4 h-4 animate-spin mr-2" /> Carregando...
+                    </div>
+                  ) : showTestData ? (
+                    <div className="flex-1 flex flex-col min-h-0">
+                      <div className="flex items-center justify-between px-3 py-2 border-b border-slate-100 bg-white">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-slate-600">Dados de Teste (JSON)</span>
+                          {templateVariables.length > 0 && (
+                            <span className="text-[10px] text-slate-400">
+                              Variáveis: {templateVariables.join(', ')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex-1 min-h-0">
+                        <CodeEditor
+                          value={testDataJson}
+                          onChange={setTestDataJson}
+                          language="json"
+                          height="100%"
+                        />
+                      </div>
                     </div>
                   ) : (
                     <div className="flex-1 min-h-0">
@@ -790,16 +749,6 @@ export function TemplatesPage() {
               )}
             </div>
 
-            {/* Test Data Panel */}
-            {showTestData && (
-              <TestDataPanel
-                json={testDataJson}
-                onChange={setTestDataJson}
-                variables={templateVariables}
-                onClose={() => setShowTestData(false)}
-              />
-            )}
-
             {/* Status bar */}
             <div className="flex items-center justify-between px-3 py-1 border-t border-slate-200 bg-white text-[10px] text-slate-400">
               <div className="flex items-center gap-3">
@@ -822,12 +771,12 @@ export function TemplatesPage() {
               <div className="flex items-center justify-center w-16 h-16 rounded-xl bg-botica-100 text-botica-600 mx-auto mb-4">
                 <FileText className="w-8 h-8" />
               </div>
-              <h3 className="text-lg font-semibold text-slate-700 mb-1">Templates de E-mail</h3>
+              <h3 className="text-lg font-semibold text-slate-700 mb-1">E-mails</h3>
               <p className="text-sm text-slate-500 mb-4">
-                Selecione um template na barra lateral ou crie um novo para começar a editar.
+                Selecione um e-mail na barra lateral ou crie um novo para começar a editar.
               </p>
               <Button onClick={() => setNewTemplateDialog(true)}>
-                <Plus className="w-4 h-4 mr-1" /> Novo Template
+                <Plus className="w-4 h-4 mr-1" /> Novo E-mail
               </Button>
             </div>
           </div>
@@ -880,14 +829,14 @@ export function TemplatesPage() {
       <Dialog open={newTemplateDialog} onOpenChange={setNewTemplateDialog}>
         <DialogContent onClose={() => setNewTemplateDialog(false)}>
           <DialogHeader>
-            <DialogTitle>Novo Template</DialogTitle>
+            <DialogTitle>Novo E-mail</DialogTitle>
             <DialogDescription>
-              Digite um nome amigável. O slug SES será gerado automaticamente.
+              Digite um nome para identificar este e-mail.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="new-name" className="text-sm font-medium text-slate-700">Nome do Template</Label>
+              <Label htmlFor="new-name" className="text-sm font-medium text-slate-700">Nome do E-mail</Label>
               <Input
                 id="new-name"
                 value={newTemplateName}
@@ -899,7 +848,7 @@ export function TemplatesPage() {
             {newTemplateName.trim() && (
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Slug SES</span>
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Identificador</span>
                   <span className="text-[9px] text-slate-400">(auto-gerado)</span>
                 </div>
                 <code className="text-xs text-botica-700 font-mono block">{slugifyTemplateName(newTemplateName.trim())}</code>
@@ -919,7 +868,7 @@ export function TemplatesPage() {
       <Dialog open={deleteConfirmDialog} onOpenChange={setDeleteConfirmDialog}>
         <DialogContent onClose={() => setDeleteConfirmDialog(false)}>
           <DialogHeader>
-            <DialogTitle>Excluir Template</DialogTitle>
+            <DialogTitle>Excluir E-mail</DialogTitle>
             <DialogDescription>
               Tem certeza que deseja excluir "{deleteTarget}"? Esta ação não pode ser desfeita.
             </DialogDescription>
@@ -937,12 +886,12 @@ export function TemplatesPage() {
       <Dialog open={duplicateDialog} onOpenChange={setDuplicateDialog}>
         <DialogContent onClose={() => setDuplicateDialog(false)}>
           <DialogHeader>
-            <DialogTitle>Duplicar Template</DialogTitle>
+            <DialogTitle>Duplicar E-mail</DialogTitle>
             <DialogDescription>Informe o nome para a cópia</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="dup-name" className="text-sm font-medium text-slate-700">Nome do Template</Label>
+              <Label htmlFor="dup-name" className="text-sm font-medium text-slate-700">Nome do E-mail</Label>
               <Input
                 id="dup-name"
                 value={duplicateNewName}
@@ -954,7 +903,7 @@ export function TemplatesPage() {
             {duplicateNewName.trim() && (
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Slug SES</span>
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Identificador</span>
                   <span className="text-[9px] text-slate-400">(auto-gerado)</span>
                 </div>
                 <code className="text-xs text-botica-700 font-mono block">{slugifyTemplateName(duplicateNewName.trim())}</code>

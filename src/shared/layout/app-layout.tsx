@@ -21,7 +21,7 @@ const navigation: NavItem[] = [
   { name: 'Segmentação', href: '/segmentation', icon: ListFilter },
   { name: 'Automações', href: '/automations', icon: Workflow },
   { name: 'Campanhas', href: '/campaigns', icon: Send },
-  { name: 'Templates', href: '/templates', icon: FileText },
+  { name: 'E-mails', href: '/templates', icon: FileText },
   { name: 'Cashback', href: '/cashback', icon: Wallet },
   { name: 'Relatórios', href: '/reports', icon: BarChart3 },
   { name: 'Configurações', href: '/settings', icon: Settings, roles: ['ADMIN'] },

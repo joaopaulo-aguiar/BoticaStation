@@ -1,4 +1,4 @@
-# BoticaStation v0.37 — AppSync GraphQL Schema
+# BoticaStation v0.39 — AppSync GraphQL Schema
 # Region: sa-east-1 | API ID: hs5qzjtrwrgctclh2rv7yp76lq
 # Auth: Cognito User Pool (sa-east-1_0ySBjVR2a)
 
@@ -81,6 +81,9 @@ type Contact {
 	updatedAt: AWSDateTime
 	source: String!
 	status: String!
+	emailStatus: String
+	emailFailReason: String
+	phoneStatus: String
 	createdBy: String
 	updatedBy: String
 }
@@ -114,6 +117,8 @@ input UpdateContactInput {
 	lifecycleStage: String
 	tags: [String!]
 	status: String
+	emailStatus: String
+	phoneStatus: String
 }
 
 input ContactFilterInput {
@@ -140,6 +145,66 @@ enum SortDirection {
 	DESC
 }
 
+# ── SES / Settings ────────────────────────────────────────────────────────────
+
+type SesAccountStatus {
+	sendingEnabled: Boolean!
+	inSandbox: Boolean!
+	max24HourSend: Float!
+	sentLast24Hours: Float!
+	maxSendRate: Float!
+	configSets: Int!
+}
+
+type SenderProfile {
+	id: ID!
+	name: String!
+	email: String!
+	replyTo: String
+	isDefault: Boolean!
+	createdAt: AWSDateTime!
+}
+
+input CreateSenderProfileInput {
+	name: String!
+	email: String!
+	replyTo: String
+	isDefault: Boolean
+}
+
+# ── Cognito ───────────────────────────────────────────────────────────────────
+
+type CognitoUser {
+	username: String!
+	email: String!
+	name: String
+	status: String!
+	enabled: Boolean!
+	groups: [String!]!
+	createdAt: AWSDateTime!
+	updatedAt: AWSDateTime
+}
+
+type CognitoGroup {
+	name: String!
+	description: String
+	precedence: Int
+	createdAt: AWSDateTime!
+	updatedAt: AWSDateTime
+}
+
+input CreateUserInput {
+	email: String!
+	name: String!
+	temporaryPassword: String!
+	group: String!
+}
+
+input UpdateUserInput {
+	name: String
+	enabled: Boolean
+}
+
 # ── Queries ───────────────────────────────────────────────────────────────────
 
 type Query {
@@ -153,8 +218,13 @@ type Query {
 	getContact(id: ID!): Contact
 	findContactByEmail(email: String!): Contact
 	findContactByPhone(phone: String!): Contact
-	# SES / Settings
+	# SES
 	listVerifiedIdentities: [VerifiedIdentity!]!
+	getSesAccountStatus: SesAccountStatus!
+	listSenderProfiles: [SenderProfile!]!
+	# Cognito
+	listUsers: [CognitoUser!]!
+	listGroups: [CognitoGroup!]!
 }
 
 # ── Mutations ─────────────────────────────────────────────────────────────────
@@ -170,7 +240,17 @@ type Mutation {
 	updateContact(id: ID!, input: UpdateContactInput!): Contact!
 	deleteContact(id: ID!): Boolean!
 	importContacts(inputs: [CreateContactInput!]!): ImportResult!
-	# SES / Settings
+	# SES
 	requestEmailVerification(email: String!): Boolean!
+	verifyDomain(domain: String!): [String!]!
 	deleteVerifiedIdentity(identity: String!): Boolean!
+	createSenderProfile(input: CreateSenderProfileInput!): SenderProfile!
+	deleteSenderProfile(id: ID!): Boolean!
+	# Cognito
+	createUser(input: CreateUserInput!): CognitoUser!
+	updateUser(username: String!, input: UpdateUserInput!): CognitoUser!
+	deleteUser(username: String!): Boolean!
+	addUserToGroup(username: String!, group: String!): Boolean!
+	removeUserFromGroup(username: String!, group: String!): Boolean!
+	resetUserPassword(username: String!): Boolean!
 }

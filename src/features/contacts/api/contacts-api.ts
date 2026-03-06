@@ -30,6 +30,9 @@ const CONTACT_FIELDS = /* GraphQL */ `
     updatedAt
     source
     status
+    emailStatus
+    emailFailReason
+    phoneStatus
     createdBy
     updatedBy
   }
