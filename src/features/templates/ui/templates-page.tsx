@@ -18,6 +18,7 @@ import {
   useDeleteTemplate, useDuplicateTemplate, useSendTestEmail,
   useTemplateVersions,
 } from '../hooks/use-templates'
+import { useDefaultConfigurationSet, useConfigurationSets, useSenderProfiles } from '@/features/settings/hooks/use-settings'
 import { slugifyTemplateName } from '../api/templates-api'
 import { renderHandlebars, safeParseJsonObject } from '../lib/handlebars-lite'
 import { htmlToPlainText, extractTemplateVariables } from '../lib/html-to-text'
@@ -70,7 +71,7 @@ function TemplateSidebar({
   }, [templates, search])
 
   return (
-    <aside className="w-[480px] border-r border-slate-200 bg-white flex flex-col shrink-0">
+    <aside className="w-96 border-r border-slate-200 bg-white flex flex-col shrink-0">
       {/* Header */}
       <div className="p-3 border-b border-slate-200">
         <div className="flex items-center justify-between mb-2">
@@ -295,7 +296,7 @@ function VersionHistoryDialog({
 
 // ── Main Page ────────────────────────────────────────────────────────────────
 
-export function TemplatesPage() {
+export function TemplatesPage({ embedded }: { embedded?: boolean } = {}) {
   const user = useAuthStore((s) => s.user)
 
   // ── List & detail ──
@@ -309,6 +310,9 @@ export function TemplatesPage() {
   const deleteTemplate = useDeleteTemplate()
   const duplicateTemplate = useDuplicateTemplate()
   const sendTestEmail = useSendTestEmail()
+  const { data: defaultConfigSet } = useDefaultConfigurationSet()
+  const { data: configSets = [] } = useConfigurationSets()
+  const { data: senderProfiles = [] } = useSenderProfiles()
 
   // ── Editor state ──
   const [displayName, setDisplayName] = useState('')
@@ -337,7 +341,14 @@ export function TemplatesPage() {
   const [duplicateSource, setDuplicateSource] = useState<string | null>(null)
   const [testEmailDialog, setTestEmailDialog] = useState(false)
   const [testEmailAddress, setTestEmailAddress] = useState(user?.email ?? '')
+  const [testConfigSet, setTestConfigSet] = useState('')
+  const [testSender, setTestSender] = useState('')
   const [versionHistoryDialog, setVersionHistoryDialog] = useState(false)
+
+  const openTestEmailDialog = useCallback(() => {
+    if (!testSender && senderProfiles.length > 0) setTestSender(senderProfiles[0].id)
+    setTestEmailDialog(true)
+  }, [testSender, senderProfiles])
 
   // ── Context menu ──
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
@@ -485,17 +496,22 @@ export function TemplatesPage() {
   const handleSendTest = useCallback(async () => {
     if (!selectedName || !testEmailAddress.trim()) return
     try {
+      const configSet = testConfigSet || defaultConfigSet || undefined
+      const sender = senderProfiles.find((s) => s.id === testSender)
+      const fromAddr = sender ? `${sender.name} <${sender.email}>` : undefined
       await sendTestEmail.mutateAsync({
         templateName: selectedName,
         toAddress: testEmailAddress.trim(),
         testData: testDataJson !== '{}' ? testDataJson : undefined,
+        configurationSet: configSet,
+        fromAddress: fromAddr,
       })
       setTestEmailDialog(false)
       showToast('E-mail de teste enviado!')
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Erro ao enviar', 'error')
     }
-  }, [selectedName, testEmailAddress, testDataJson, sendTestEmail, showToast])
+  }, [selectedName, testEmailAddress, testDataJson, testConfigSet, testSender, senderProfiles, sendTestEmail, defaultConfigSet, showToast])
 
   const handleContextMenu = useCallback((e: React.MouseEvent, t: TemplateSummary) => {
     e.preventDefault()
@@ -528,7 +544,7 @@ export function TemplatesPage() {
   const hasTemplate = !!selectedName
 
   return (
-    <div className="flex h-[calc(100vh-4rem-2.25rem)] -m-4 lg:-m-6 bg-slate-50">
+    <div className={cn('flex bg-slate-50', embedded ? 'h-full' : 'h-[calc(100vh-4rem-2.25rem)] -m-4 lg:-m-6')}>
       {/* Sidebar */}
       {sidebarVisible && (
         <TemplateSidebar
@@ -562,7 +578,7 @@ export function TemplatesPage() {
           {hasTemplate ? (
             <>
               {/* Name (display name - read-only label) */}
-              <div className="flex items-center gap-1.5 min-w-0 shrink-0 max-w-[40%]">
+              <div className="flex items-center gap-1.5 min-w-0 shrink-0 max-w-[50%]">
                 <span className="text-xs font-medium text-slate-500 shrink-0">Nome:</span>
                 <span className="text-xs font-semibold text-slate-700 truncate" title={displayName}>
                   {displayName}
@@ -667,7 +683,7 @@ export function TemplatesPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setTestEmailDialog(true)}
+                onClick={() => openTestEmailDialog()}
                 title="Enviar e-mail de teste"
               >
                 <Send className="w-3.5 h-3.5" />
@@ -805,7 +821,7 @@ export function TemplatesPage() {
             onClick: () => {
               if (contextMenu.template) {
                 setSelectedName(contextMenu.template.name)
-                setTestEmailDialog(true)
+                openTestEmailDialog()
               }
             },
           },
@@ -921,27 +937,84 @@ export function TemplatesPage() {
 
       {/* Send Test Email */}
       <Dialog open={testEmailDialog} onOpenChange={setTestEmailDialog}>
-        <DialogContent onClose={() => setTestEmailDialog(false)}>
+        <DialogContent onClose={() => setTestEmailDialog(false)} className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Enviar E-mail de Teste</DialogTitle>
             <DialogDescription>O template será renderizado com os dados de teste atuais.</DialogDescription>
           </DialogHeader>
-          <div>
-            <Label htmlFor="test-email">Endereço de e-mail</Label>
-            <Input
-              id="test-email"
-              type="email"
-              value={testEmailAddress}
-              onChange={(e) => setTestEmailAddress(e.target.value)}
-              placeholder="teste@exemplo.com"
-              className="mt-1"
-            />
+          <div className="space-y-4">
+            {/* Sender selection */}
+            <div>
+              <Label className="text-sm font-medium">Remetente</Label>
+              {senderProfiles.length === 0 ? (
+                <p className="text-xs text-amber-600 mt-1">Configure um perfil de remetente em Configurações.</p>
+              ) : (
+                <div className="mt-1.5 space-y-1.5">
+                  {senderProfiles.map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => setTestSender(s.id)}
+                      className={cn(
+                        'w-full flex items-center gap-3 rounded-lg border-2 px-3 py-2.5 text-left transition-all cursor-pointer',
+                        s.id === testSender
+                          ? 'border-botica-500 bg-botica-50'
+                          : 'border-slate-200 hover:border-slate-300',
+                      )}
+                    >
+                      <div className={cn(
+                        'flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold flex-shrink-0',
+                        s.id === testSender ? 'bg-botica-600 text-white' : 'bg-slate-200 text-slate-600',
+                      )}>
+                        {s.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-800 truncate">{s.name}</p>
+                        <p className="text-xs text-slate-500 truncate">{s.email}</p>
+                      </div>
+                      {s.id === testSender && <Check className="w-4 h-4 text-botica-600 flex-shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Recipient */}
+            <div>
+              <Label htmlFor="test-email" className="text-sm font-medium">Destinatário</Label>
+              <Input
+                id="test-email"
+                type="email"
+                value={testEmailAddress}
+                onChange={(e) => setTestEmailAddress(e.target.value)}
+                placeholder="teste@exemplo.com"
+                className="mt-1.5 h-10"
+              />
+            </div>
+
+            {/* Configuration Set */}
+            <div>
+              <Label htmlFor="test-config-set" className="text-sm font-medium">Configuration Set</Label>
+              <select
+                id="test-config-set"
+                value={testConfigSet}
+                onChange={(e) => setTestConfigSet(e.target.value)}
+                className="mt-1.5 w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-sm"
+              >
+                <option value="">{defaultConfigSet ? `Padrão: ${defaultConfigSet}` : 'Nenhum (padrão da conta)'}</option>
+                {configSets.map((cs) => (
+                  <option key={cs} value={cs}>{cs}</option>
+                ))}
+              </select>
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                Se não selecionado, será usado o configuration set padrão das configurações.
+              </p>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTestEmailDialog(false)}>Cancelar</Button>
-            <Button onClick={handleSendTest} disabled={!testEmailAddress.trim() || sendTestEmail.isPending}>
+            <Button onClick={handleSendTest} disabled={!testEmailAddress.trim() || !testSender || sendTestEmail.isPending}>
               <Send className="w-3.5 h-3.5 mr-1" />
-              {sendTestEmail.isPending ? 'Enviando...' : 'Enviar'}
+              {sendTestEmail.isPending ? 'Enviando...' : 'Enviar Teste'}
             </Button>
           </DialogFooter>
         </DialogContent>

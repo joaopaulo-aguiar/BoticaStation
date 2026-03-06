@@ -3,10 +3,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { LoginPage, ProtectedRoute } from '@/features/auth'
 import { DashboardPage } from '@/features/dashboard/ui/dashboard-page'
 import { ContactsPage } from '@/features/contacts'
-import { SegmentationPage } from '@/features/segmentation'
 import { AutomationsPage } from '@/features/automations'
 import { CampaignsPage } from '@/features/campaigns/ui/campaigns-page'
-import { TemplatesPage } from '@/features/templates'
+import { TransactionalPage } from '@/features/transactional/ui/transactional-page'
 import { CashbackPage } from '@/features/cashback/ui/cashback-page'
 import { ReportsPage } from '@/features/reports/ui/reports-page'
 import { SettingsPage } from '@/features/settings/ui/settings-page'
@@ -26,10 +25,9 @@ export function App() {
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/contacts" element={<ContactsPage />} />
-            <Route path="/segmentation" element={<SegmentationPage />} />
             <Route path="/automations" element={<AutomationsPage />} />
             <Route path="/campaigns" element={<CampaignsPage />} />
-            <Route path="/templates" element={<TemplatesPage />} />
+            <Route path="/transactional" element={<TransactionalPage />} />
             <Route path="/cashback" element={<CashbackPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/settings" element={<SettingsPage />} />

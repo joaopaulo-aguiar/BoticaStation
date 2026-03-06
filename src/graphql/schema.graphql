@@ -1,4 +1,4 @@
-# BoticaStation v0.39 — AppSync GraphQL Schema
+# BoticaStation v0.41 — AppSync GraphQL Schema
 # Region: sa-east-1 | API ID: hs5qzjtrwrgctclh2rv7yp76lq
 # Auth: Cognito User Pool (sa-east-1_0ySBjVR2a)
 
@@ -70,20 +70,25 @@ type CashbackInfo {
 }
 
 type Contact {
+	# Identificação
 	id: ID!
 	email: String!
 	phone: String
 	fullName: String!
+	# Classificação
 	lifecycleStage: String!
 	cashbackInfo: CashbackInfo
 	tags: [String!]!
+	# Metadados
 	createdAt: AWSDateTime!
 	updatedAt: AWSDateTime
 	source: String!
 	status: String!
+	# Saúde dos Canais
 	emailStatus: String
 	emailFailReason: String
 	phoneStatus: String
+	# Auditoria
 	createdBy: String
 	updatedBy: String
 }
@@ -108,6 +113,8 @@ input CreateContactInput {
 	cashbackBalance: Float
 	tags: [String!]
 	source: String
+	emailStatus: String
+	phoneStatus: String
 }
 
 input UpdateContactInput {
@@ -118,6 +125,7 @@ input UpdateContactInput {
 	tags: [String!]
 	status: String
 	emailStatus: String
+	emailFailReason: String
 	phoneStatus: String
 }
 
@@ -126,6 +134,8 @@ input ContactFilterInput {
 	status: String
 	tag: String
 	search: String
+	emailStatus: String
+	phoneStatus: String
 }
 
 input ContactSortInput {
@@ -170,6 +180,55 @@ input CreateSenderProfileInput {
 	email: String!
 	replyTo: String
 	isDefault: Boolean
+}
+
+# ── Campaigns ─────────────────────────────────────────────────────────────────
+
+type CampaignMetrics {
+	sent: Int!
+	delivered: Int!
+	opened: Int!
+	clicked: Int!
+	bounced: Int!
+	complained: Int!
+	unsubscribed: Int!
+}
+
+type Campaign {
+	id: ID!
+	name: String!
+	subject: String!
+	templateName: String!
+	senderProfileId: String!
+	recipientFilter: String
+	status: String!
+	scheduledAt: AWSDateTime
+	sentAt: AWSDateTime
+	metrics: CampaignMetrics
+	configurationSet: String
+	createdAt: AWSDateTime!
+	updatedAt: AWSDateTime
+	createdBy: String
+}
+
+input CreateCampaignInput {
+	name: String!
+	subject: String!
+	templateName: String!
+	senderProfileId: String!
+	recipientFilter: String
+	scheduledAt: AWSDateTime
+	configurationSet: String
+}
+
+input UpdateCampaignInput {
+	name: String
+	subject: String
+	templateName: String
+	senderProfileId: String
+	recipientFilter: String
+	scheduledAt: AWSDateTime
+	configurationSet: String
 }
 
 # ── Cognito ───────────────────────────────────────────────────────────────────
@@ -222,6 +281,11 @@ type Query {
 	listVerifiedIdentities: [VerifiedIdentity!]!
 	getSesAccountStatus: SesAccountStatus!
 	listSenderProfiles: [SenderProfile!]!
+	listConfigurationSets: [String!]!
+	getDefaultConfigurationSet: String
+	# Campaigns
+	listCampaigns: [Campaign!]!
+	getCampaign(id: ID!): Campaign
 	# Cognito
 	listUsers: [CognitoUser!]!
 	listGroups: [CognitoGroup!]!
@@ -234,7 +298,7 @@ type Mutation {
 	saveTemplate(input: SaveTemplateInput!): SaveTemplateResult!
 	deleteTemplate(name: String!): Boolean!
 	duplicateTemplate(sourceName: String!, newName: String!, newDisplayName: String!): DuplicateTemplateResult!
-	sendTestEmail(templateName: String!, toAddress: String!, testData: AWSJSON): SendTestEmailResult!
+	sendTestEmail(templateName: String!, toAddress: String!, fromAddress: String, testData: AWSJSON, configurationSet: String): SendTestEmailResult!
 	# Contacts
 	createContact(input: CreateContactInput!): Contact!
 	updateContact(id: ID!, input: UpdateContactInput!): Contact!
@@ -246,6 +310,14 @@ type Mutation {
 	deleteVerifiedIdentity(identity: String!): Boolean!
 	createSenderProfile(input: CreateSenderProfileInput!): SenderProfile!
 	deleteSenderProfile(id: ID!): Boolean!
+	setDefaultConfigurationSet(name: String): Boolean!
+	# Campaigns
+	createCampaign(input: CreateCampaignInput!): Campaign!
+	updateCampaign(id: ID!, input: UpdateCampaignInput!): Campaign!
+	deleteCampaign(id: ID!): Boolean!
+	sendCampaign(id: ID!): Campaign!
+	pauseCampaign(id: ID!): Campaign!
+	cancelCampaign(id: ID!): Campaign!
 	# Cognito
 	createUser(input: CreateUserInput!): CognitoUser!
 	updateUser(username: String!, input: UpdateUserInput!): CognitoUser!

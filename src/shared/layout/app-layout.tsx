@@ -1,8 +1,8 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/features/auth'
 import {
-  Users, BarChart3, Send, Wallet, Settings, LogOut, Menu,
-  FileText, LayoutDashboard, X, ListFilter, Workflow,
+  Users, BarChart3, Wallet, Settings, LogOut, Menu,
+  LayoutDashboard, X, Workflow, Megaphone, ArrowRightLeft,
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/shared/lib/utils'
@@ -18,10 +18,9 @@ interface NavItem {
 const navigation: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Contatos', href: '/contacts', icon: Users },
-  { name: 'Segmentação', href: '/segmentation', icon: ListFilter },
+  { name: 'Campanhas', href: '/campaigns', icon: Megaphone },
+  { name: 'Transacionais', href: '/transactional', icon: ArrowRightLeft },
   { name: 'Automações', href: '/automations', icon: Workflow },
-  { name: 'Campanhas', href: '/campaigns', icon: Send },
-  { name: 'E-mails', href: '/templates', icon: FileText },
   { name: 'Cashback', href: '/cashback', icon: Wallet },
   { name: 'Relatórios', href: '/reports', icon: BarChart3 },
   { name: 'Configurações', href: '/settings', icon: Settings, roles: ['ADMIN'] },

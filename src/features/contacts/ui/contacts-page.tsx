@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from 'react'
 import {
   Users, Plus, Search, Trash2, Pencil, Upload, RefreshCw,
   ChevronLeft, ChevronRight, AlertCircle, Check, X,
-  AlertTriangle, Ban,
+  AlertTriangle, Ban, ListFilter,
 } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
@@ -70,9 +70,82 @@ function PhoneStatusIcon({ status }: { status: string | null }) {
   )
 }
 
-// ── Contacts Page ────────────────────────────────────────────────────────────
+// ── Contacts Page (Wrapper with Tabs) ────────────────────────────────────────
+
+type ContactsTab = 'contacts' | 'segmentation'
 
 export function ContactsPage() {
+  const [tab, setTab] = useState<ContactsTab>('contacts')
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-1 border-b border-slate-200 pb-px -mt-1">
+        <button
+          onClick={() => setTab('contacts')}
+          className={cn(
+            'flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors cursor-pointer',
+            tab === 'contacts'
+              ? 'border-botica-600 text-botica-700'
+              : 'border-transparent text-slate-500 hover:text-slate-700',
+          )}
+        >
+          <Users className="w-4 h-4" />
+          Contatos
+        </button>
+        <button
+          onClick={() => setTab('segmentation')}
+          className={cn(
+            'flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors cursor-pointer',
+            tab === 'segmentation'
+              ? 'border-botica-600 text-botica-700'
+              : 'border-transparent text-slate-500 hover:text-slate-700',
+          )}
+        >
+          <ListFilter className="w-4 h-4" />
+          Segmentação
+        </button>
+      </div>
+
+      {tab === 'contacts' ? <ContactsListView /> : <SegmentationView />}
+    </div>
+  )
+}
+
+// ── Segmentation View (Placeholder) ──────────────────────────────────────────
+
+function SegmentationView() {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-indigo-100 text-indigo-700">
+            <ListFilter className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900">Segmentação</h1>
+            <p className="text-xs text-slate-500">Crie segmentos para direcionar campanhas a públicos específicos</p>
+          </div>
+        </div>
+        <Button size="sm" disabled>
+          <Plus className="w-3.5 h-3.5 mr-1" />
+          Novo Segmento
+        </Button>
+      </div>
+      <div className="bg-white rounded-lg border border-slate-200 shadow-[var(--shadow-card)] p-12 text-center">
+        <ListFilter className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+        <p className="text-sm font-medium text-slate-600 mb-1">Segmentação de Contatos</p>
+        <p className="text-xs text-slate-400 max-w-md mx-auto">
+          Crie segmentos baseados em lifecycle stage, tags, status de e-mail, localização
+          e comportamento para enviar campanhas direcionadas com maior taxa de conversão.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ── Contacts List View ───────────────────────────────────────────────────────
+
+function ContactsListView() {
   const userRole = useAuthStore((s) => s.userRole)
 
   // ── Filters & pagination ──

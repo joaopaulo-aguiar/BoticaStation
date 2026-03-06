@@ -75,9 +75,9 @@ export function useDuplicateTemplate() {
 export function useSendTestEmail() {
   return useMutation({
     mutationFn: ({
-      templateName, toAddress, testData,
-    }: { templateName: string; toAddress: string; testData?: string }) =>
-      api.sendTestEmail(templateName, toAddress, testData),
+      templateName, toAddress, testData, configurationSet, fromAddress,
+    }: { templateName: string; toAddress: string; testData?: string; configurationSet?: string; fromAddress?: string }) =>
+      api.sendTestEmail(templateName, toAddress, testData, configurationSet, fromAddress),
   })
 }
 

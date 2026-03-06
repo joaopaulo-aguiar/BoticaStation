@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import {
   Settings, Mail, Plus, Trash2, RefreshCw, CheckCircle2, XCircle, Clock,
   AlertCircle, Check, Globe, Send, Server, Users, Shield, Key, UserPlus,
-  ToggleLeft, ToggleRight, Search,
+  ToggleLeft, ToggleRight, Search, Layers,
 } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
@@ -24,6 +24,9 @@ import {
   useSenderProfiles,
   useCreateSenderProfile,
   useDeleteSenderProfile,
+  useConfigurationSets,
+  useDefaultConfigurationSet,
+  useSetDefaultConfigurationSet,
   useUsersList,
   useCreateUser,
   useUpdateUser,
@@ -344,6 +347,9 @@ function IdentitiesTab({ showToast }: { showToast: (m: string, t?: 'success' | '
         </div>
       </div>
 
+      {/* Configuration Sets */}
+      <ConfigurationSetsSection showToast={showToast} />
+
       {/* Add Email Dialog */}
       <Dialog open={addEmailDialog} onOpenChange={setAddEmailDialog}>
         <DialogContent onClose={() => setAddEmailDialog(false)}>
@@ -408,6 +414,73 @@ function IdentitiesTab({ showToast }: { showToast: (m: string, t?: 'success' | '
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+// ── Configuration Sets Section ───────────────────────────────────────────────
+
+function ConfigurationSetsSection({ showToast }: { showToast: (m: string, t?: 'success' | 'error') => void }) {
+  const { data: configSets = [], isLoading } = useConfigurationSets()
+  const { data: defaultSet } = useDefaultConfigurationSet()
+  const setDefault = useSetDefaultConfigurationSet()
+
+  const handleChange = useCallback(async (value: string) => {
+    try {
+      await setDefault.mutateAsync(value || null)
+      showToast(value ? `Configuration set "${value}" definido como padrão` : 'Configuration set padrão removido')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Erro ao definir configuration set', 'error')
+    }
+  }, [setDefault, showToast])
+
+  return (
+    <div className="bg-white rounded-lg border border-slate-200 shadow-[var(--shadow-card)]">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        <div className="flex items-center gap-2">
+          <Layers className="w-5 h-5 text-botica-600" />
+          <div>
+            <h2 className="text-sm font-semibold text-slate-700">Configuration Sets</h2>
+            <p className="text-xs text-slate-500">Conjuntos de regras aplicados ao envio de e-mails (rastreamento, eventos)</p>
+          </div>
+        </div>
+      </div>
+      <div className="p-6 space-y-4">
+        <div>
+          <Label htmlFor="default-config-set">Configuration Set Padrão</Label>
+          <select
+            id="default-config-set"
+            value={defaultSet ?? ''}
+            onChange={(e) => handleChange(e.target.value)}
+            disabled={isLoading || setDefault.isPending}
+            className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+          >
+            <option value="">Nenhum (padrão da conta)</option>
+            {configSets.map((cs) => (
+              <option key={cs} value={cs}>{cs}</option>
+            ))}
+          </select>
+          <p className="text-xs text-slate-400 mt-1">
+            Este configuration set será usado em todos os envios de e-mail (campanhas e testes).
+          </p>
+        </div>
+        {configSets.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold text-slate-500 mb-2">DISPONÍVEIS:</p>
+            <div className="flex flex-wrap gap-2">
+              {configSets.map((cs) => (
+                <Badge key={cs} variant={cs === defaultSet ? 'active' : 'default'}>{cs}</Badge>
+              ))}
+            </div>
+          </div>
+        )}
+        {isLoading && (
+          <div className="text-center text-sm text-slate-400">
+            <RefreshCw className="w-4 h-4 animate-spin mx-auto mb-1" />
+            Carregando...
+          </div>
+        )}
+      </div>
     </div>
   )
 }

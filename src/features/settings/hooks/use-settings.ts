@@ -6,6 +6,8 @@ const KEYS = {
   identities: ['ses-identities'] as const,
   sesStatus: ['ses-status'] as const,
   senderProfiles: ['sender-profiles'] as const,
+  configSets: ['config-sets'] as const,
+  defaultConfigSet: ['default-config-set'] as const,
   users: ['cognito-users'] as const,
   groups: ['cognito-groups'] as const,
 }
@@ -75,6 +77,32 @@ export function useDeleteSenderProfile() {
   return useMutation({
     mutationFn: api.deleteSenderProfile,
     onSuccess: () => { qc.invalidateQueries({ queryKey: KEYS.senderProfiles }) },
+  })
+}
+
+// ── Configuration Sets ───────────────────────────────────────────────────────
+
+export function useConfigurationSets() {
+  return useQuery({
+    queryKey: KEYS.configSets,
+    queryFn: api.listConfigurationSets,
+    staleTime: 60_000,
+  })
+}
+
+export function useDefaultConfigurationSet() {
+  return useQuery({
+    queryKey: KEYS.defaultConfigSet,
+    queryFn: api.getDefaultConfigurationSet,
+    staleTime: 60_000,
+  })
+}
+
+export function useSetDefaultConfigurationSet() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: api.setDefaultConfigurationSet,
+    onSuccess: () => { qc.invalidateQueries({ queryKey: KEYS.defaultConfigSet }) },
   })
 }
 

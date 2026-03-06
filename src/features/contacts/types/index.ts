@@ -45,6 +45,8 @@ export interface CreateContactInput {
   cashbackBalance?: number | null
   tags?: string[] | null
   source?: string | null
+  emailStatus?: string | null
+  phoneStatus?: string | null
 }
 
 export interface UpdateContactInput {
@@ -55,6 +57,7 @@ export interface UpdateContactInput {
   tags?: string[] | null
   status?: string | null
   emailStatus?: string | null
+  emailFailReason?: string | null
   phoneStatus?: string | null
 }
 
@@ -63,6 +66,8 @@ export interface ContactFilterInput {
   status?: string | null
   tag?: string | null
   search?: string | null
+  emailStatus?: string | null
+  phoneStatus?: string | null
 }
 
 export interface ContactSortInput {

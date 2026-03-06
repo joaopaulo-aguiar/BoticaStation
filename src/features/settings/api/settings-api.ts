@@ -111,6 +111,38 @@ export async function deleteSenderProfile(id: string): Promise<boolean> {
   return data.deleteSenderProfile
 }
 
+// ── Configuration Sets ───────────────────────────────────────────────────────
+
+export async function listConfigurationSets(): Promise<string[]> {
+  const query = /* GraphQL */ `
+    query ListConfigurationSets {
+      listConfigurationSets
+    }
+  `
+  const { data } = await client.graphql({ query }) as { data: { listConfigurationSets: string[] } }
+  return data.listConfigurationSets ?? []
+}
+
+export async function getDefaultConfigurationSet(): Promise<string | null> {
+  const query = /* GraphQL */ `
+    query GetDefaultConfigurationSet {
+      getDefaultConfigurationSet
+    }
+  `
+  const { data } = await client.graphql({ query }) as { data: { getDefaultConfigurationSet: string | null } }
+  return data.getDefaultConfigurationSet
+}
+
+export async function setDefaultConfigurationSet(name: string | null): Promise<boolean> {
+  const mutation = /* GraphQL */ `
+    mutation SetDefaultConfigurationSet($name: String) {
+      setDefaultConfigurationSet(name: $name)
+    }
+  `
+  const { data } = await client.graphql({ query: mutation, variables: { name } }) as { data: { setDefaultConfigurationSet: boolean } }
+  return data.setDefaultConfigurationSet
+}
+
 // ── Cognito Users ────────────────────────────────────────────────────────────
 
 export async function listUsers(): Promise<CognitoUser[]> {
