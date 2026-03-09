@@ -1,4 +1,4 @@
-# BoticaStation v0.41 — AppSync GraphQL Schema
+# BoticaStation v0.43 — AppSync GraphQL Schema
 # Region: sa-east-1 | API ID: hs5qzjtrwrgctclh2rv7yp76lq
 # Auth: Cognito User Pool (sa-east-1_0ySBjVR2a)
 
@@ -69,6 +69,17 @@ type CashbackInfo {
 	expiryDate: String
 }
 
+type ContactStats {
+	emailSends: Int!
+	emailDeliveries: Int!
+	emailOpens: Int!
+	emailClicks: Int!
+	emailBounces: Int!
+	emailComplaints: Int!
+	smsSends: Int!
+	smsDeliveries: Int!
+}
+
 type Contact {
 	# Identificação
 	id: ID!
@@ -88,6 +99,8 @@ type Contact {
 	emailStatus: String
 	emailFailReason: String
 	phoneStatus: String
+	# Contadores (atualizados atomicamente pela Lambda SES/SMS)
+	stats: ContactStats
 	# Auditoria
 	createdBy: String
 	updatedBy: String
@@ -153,6 +166,76 @@ enum ContactSortField {
 enum SortDirection {
 	ASC
 	DESC
+}
+
+# ── Contact Events ────────────────────────────────────────────────────────────
+# Tabela: ContactEvent | Data Source: ContactEventTable
+# PK = CONTACT#{contactId}, SK = EVENT#{timestamp}#{messageId}
+# Stats item: PK = CONTACT#{contactId}, SK = EMAIL_STATS
+
+type ContactEvent {
+	contactId: ID!
+	eventId: String!
+	channel: String!
+	eventType: String!
+	details: String
+	campaignId: String
+	campaignName: String
+	subject: String
+	createdAt: AWSDateTime!
+}
+
+type ContactEventListResult {
+	items: [ContactEvent!]!
+	nextToken: String
+}
+
+input ContactEventFilterInput {
+	channel: String
+	eventType: String
+}
+
+# ── Segments ──────────────────────────────────────────────────────────────────
+# Tabela: Config_Table | Data Source: ConfigTable
+# PK = SEGMENT, SK = SEGMENT#{segmentId}
+
+type SegmentCondition {
+	field: String!
+	operator: String!
+	value: String!
+}
+
+type Segment {
+	id: ID!
+	name: String!
+	description: String
+	conditionLogic: String!
+	conditions: [SegmentCondition!]!
+	contactCount: Int
+	lastCountAt: AWSDateTime
+	createdAt: AWSDateTime!
+	updatedAt: AWSDateTime
+	createdBy: String
+}
+
+input SegmentConditionInput {
+	field: String!
+	operator: String!
+	value: String!
+}
+
+input CreateSegmentInput {
+	name: String!
+	description: String
+	conditionLogic: String
+	conditions: [SegmentConditionInput!]!
+}
+
+input UpdateSegmentInput {
+	name: String
+	description: String
+	conditionLogic: String
+	conditions: [SegmentConditionInput!]
 }
 
 # ── SES / Settings ────────────────────────────────────────────────────────────
@@ -277,6 +360,12 @@ type Query {
 	getContact(id: ID!): Contact
 	findContactByEmail(email: String!): Contact
 	findContactByPhone(phone: String!): Contact
+	# Contact Events
+	listContactEvents(contactId: ID!, limit: Int, nextToken: String, filter: ContactEventFilterInput): ContactEventListResult!
+	# Segments
+	listSegments: [Segment!]!
+	getSegment(id: ID!): Segment
+	previewSegmentContacts(conditions: [SegmentConditionInput!]!, conditionLogic: String, search: String, pageSize: Int, nextToken: String): ContactListResult!
 	# SES
 	listVerifiedIdentities: [VerifiedIdentity!]!
 	getSesAccountStatus: SesAccountStatus!
@@ -298,12 +387,16 @@ type Mutation {
 	saveTemplate(input: SaveTemplateInput!): SaveTemplateResult!
 	deleteTemplate(name: String!): Boolean!
 	duplicateTemplate(sourceName: String!, newName: String!, newDisplayName: String!): DuplicateTemplateResult!
-	sendTestEmail(templateName: String!, toAddress: String!, fromAddress: String, testData: AWSJSON, configurationSet: String): SendTestEmailResult!
+	sendTestEmail(templateName: String!, toAddress: String!, fromAddress: String, testData: AWSJSON, configurationSet: String, tags: AWSJSON): SendTestEmailResult!
 	# Contacts
 	createContact(input: CreateContactInput!): Contact!
 	updateContact(id: ID!, input: UpdateContactInput!): Contact!
 	deleteContact(id: ID!): Boolean!
 	importContacts(inputs: [CreateContactInput!]!): ImportResult!
+	# Segments
+	createSegment(input: CreateSegmentInput!): Segment!
+	updateSegment(id: ID!, input: UpdateSegmentInput!): Segment!
+	deleteSegment(id: ID!): Boolean!
 	# SES
 	requestEmailVerification(email: String!): Boolean!
 	verifyDomain(domain: String!): [String!]!

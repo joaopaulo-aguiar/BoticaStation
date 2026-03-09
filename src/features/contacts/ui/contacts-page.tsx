@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo } from 'react'
 import {
   Users, Plus, Search, Trash2, Pencil, Upload, RefreshCw,
   ChevronLeft, ChevronRight, AlertCircle, Check, X,
-  AlertTriangle, Ban, ListFilter,
+  AlertTriangle, Ban, ListFilter, Filter, Tag, Calendar,
 } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
@@ -10,7 +10,7 @@ import { Badge } from '@/shared/ui/badge'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/shared/ui/dialog'
-import { cn } from '@/shared/lib/utils'
+import { cn, formatPhone } from '@/shared/lib/utils'
 import { useAuthStore } from '@/features/auth/store/auth-store'
 import {
   useContactsList,
@@ -20,10 +20,13 @@ import {
   useImportContacts,
 } from '../hooks/use-contacts'
 import { ContactFormDialog } from './contact-form-dialog'
+import { ContactDetailDialog } from './contact-detail-dialog'
 import { ImportCsvDialog } from './import-csv-dialog'
+import { SegmentationView } from '@/features/segmentation/ui/segmentation-page'
 import {
   LIFECYCLE_STAGES,
   CONTACT_STATUSES,
+  EMAIL_STATUSES,
 } from '../types'
 import type {
   Contact,
@@ -111,36 +114,15 @@ export function ContactsPage() {
   )
 }
 
-// ── Segmentation View (Placeholder) ──────────────────────────────────────────
+// ── Time helper ──────────────────────────────────────────────────────────────
 
-function SegmentationView() {
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-indigo-100 text-indigo-700">
-            <ListFilter className="w-5 h-5" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900">Segmentação</h1>
-            <p className="text-xs text-slate-500">Crie segmentos para direcionar campanhas a públicos específicos</p>
-          </div>
-        </div>
-        <Button size="sm" disabled>
-          <Plus className="w-3.5 h-3.5 mr-1" />
-          Novo Segmento
-        </Button>
-      </div>
-      <div className="bg-white rounded-lg border border-slate-200 shadow-[var(--shadow-card)] p-12 text-center">
-        <ListFilter className="w-10 h-10 text-slate-300 mx-auto mb-3" />
-        <p className="text-sm font-medium text-slate-600 mb-1">Segmentação de Contatos</p>
-        <p className="text-xs text-slate-400 max-w-md mx-auto">
-          Crie segmentos baseados em lifecycle stage, tags, status de e-mail, localização
-          e comportamento para enviar campanhas direcionadas com maior taxa de conversão.
-        </p>
-      </div>
-    </div>
-  )
+function formatRelativeDate(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const days = Math.floor(diff / 86_400_000)
+  if (days === 0) return 'Hoje'
+  if (days === 1) return 'Ontem'
+  if (days < 7) return `${days}d atrás`
+  return new Date(dateStr).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
 // ── Contacts List View ───────────────────────────────────────────────────────
@@ -152,19 +134,25 @@ function ContactsListView() {
   const [search, setSearch] = useState('')
   const [filterLifecycle, setFilterLifecycle] = useState<string | null>(null)
   const [filterStatus, setFilterStatus] = useState<string | null>(null)
-  const [showFilters] = useState(false)
+  const [filterEmailStatus, setFilterEmailStatus] = useState<string | null>(null)
+  const [filterTag, setFilterTag] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
   const [pageSize] = useState(50)
   const [nextToken, setNextToken] = useState<string | null>(null)
   const [tokenHistory, setTokenHistory] = useState<(string | null)[]>([null])
-  const [sort] = useState<ContactSortInput>({ field: 'CREATED_AT', direction: 'DESC' })
+  const [sort, setSort] = useState<ContactSortInput>({ field: 'CREATED_AT', direction: 'DESC' })
+
+  const activeFilterCount = [filterLifecycle, filterStatus, filterEmailStatus, filterTag.trim()].filter(Boolean).length
 
   const filter = useMemo<ContactFilterInput | null>(() => {
     const f: ContactFilterInput = {}
     if (search.trim()) f.search = search.trim()
     if (filterLifecycle) f.lifecycleStage = filterLifecycle
     if (filterStatus) f.status = filterStatus
+    if (filterEmailStatus) f.emailStatus = filterEmailStatus
+    if (filterTag.trim()) f.tag = filterTag.trim()
     return Object.keys(f).length ? f : null
-  }, [search, filterLifecycle, filterStatus])
+  }, [search, filterLifecycle, filterStatus, filterEmailStatus, filterTag])
 
   const { data, isLoading } = useContactsList(pageSize, nextToken, filter, sort)
   const contacts = data?.items ?? []
@@ -183,6 +171,7 @@ function ContactsListView() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Contact | null>(null)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [detailContact, setDetailContact] = useState<Contact | null>(null)
 
   // ── Toast ──
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
@@ -197,7 +186,8 @@ function ContactsListView() {
     setFormDialogOpen(true)
   }, [])
 
-  const handleEdit = useCallback((contact: Contact) => {
+  const handleEdit = useCallback((contact: Contact, e: React.MouseEvent) => {
+    e.stopPropagation()
     setEditingContact(contact)
     setFormDialogOpen(true)
   }, [])
@@ -257,9 +247,24 @@ function ContactsListView() {
     setSearch('')
     setFilterLifecycle(null)
     setFilterStatus(null)
+    setFilterEmailStatus(null)
+    setFilterTag('')
     setNextToken(null)
     setTokenHistory([null])
   }, [])
+
+  const resetPagination = useCallback(() => {
+    setNextToken(null)
+    setTokenHistory([null])
+  }, [])
+
+  const handleSort = useCallback((field: ContactSortInput['field']) => {
+    setSort((prev) => ({
+      field,
+      direction: prev.field === field && prev.direction === 'ASC' ? 'DESC' : 'ASC',
+    }))
+    resetPagination()
+  }, [resetPagination])
 
   const canDelete = userRole === 'ADMIN' || userRole === 'GESTOR'
   const canImport = userRole === 'ADMIN'
@@ -275,21 +280,31 @@ function ContactsListView() {
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
             <Input
               value={search}
-              onChange={(e) => { setSearch(e.target.value); setNextToken(null); setTokenHistory([null]) }}
-              placeholder="Buscar contato..."
+              onChange={(e) => { setSearch(e.target.value); resetPagination() }}
+              placeholder="Buscar por nome, e-mail ou telefone..."
               className="pl-8 h-8 text-xs"
             />
           </div>
 
+          {/* Filter toggle */}
+          <Button
+            variant={showFilters || activeFilterCount > 0 ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setShowFilters(!showFilters)}
+            className="relative"
+          >
+            <Filter className="w-3.5 h-3.5 mr-1" />
+            Filtros
+            {activeFilterCount > 0 && (
+              <span className="ml-1 min-w-[18px] h-[18px] rounded-full bg-white text-botica-700 text-[10px] font-bold flex items-center justify-center">
+                {activeFilterCount}
+              </span>
+            )}
+          </Button>
+
           {/* Stats badges */}
           <div className="hidden md:flex items-center gap-2 text-[11px] text-slate-500">
             <span>Total: <strong className="text-slate-700">{data?.totalCount ?? contacts.length}</strong></span>
-            {contacts.length > 0 && (
-              <>
-                <span>Customers: <strong className="text-emerald-600">{contacts.filter(c => c.lifecycleStage === 'customer').length}</strong></span>
-                <span>Leads: <strong className="text-blue-600">{contacts.filter(c => c.lifecycleStage === 'lead').length}</strong></span>
-              </>
-            )}
           </div>
 
           <div className="flex-1" />
@@ -307,60 +322,106 @@ function ContactsListView() {
           </Button>
         </div>
 
-        {/* Filters row (inline, always visible when active) */}
-        {(filterLifecycle || filterStatus || showFilters) && (
-          <div className="flex items-center gap-4 px-4 py-2.5 border-b border-slate-100 bg-slate-50">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-medium text-slate-500">Estágio:</span>
-              <button
-                onClick={() => setFilterLifecycle(null)}
-                className={cn(
-                  'px-2 py-0.5 rounded text-[11px] cursor-pointer transition-colors',
-                  !filterLifecycle ? 'bg-botica-100 text-botica-700 font-medium' : 'text-slate-500 hover:bg-slate-100',
-                )}
-              >
-                Todos
-              </button>
-              {LIFECYCLE_STAGES.map((ls) => (
+        {/* Filters row */}
+        {(showFilters || activeFilterCount > 0) && (
+          <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50 space-y-2">
+            <div className="flex items-center gap-4 flex-wrap">
+              {/* Lifecycle */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-medium text-slate-500">Estágio:</span>
                 <button
-                  key={ls.value}
-                  onClick={() => { setFilterLifecycle(filterLifecycle === ls.value ? null : ls.value); setNextToken(null); setTokenHistory([null]) }}
+                  onClick={() => { setFilterLifecycle(null); resetPagination() }}
                   className={cn(
                     'px-2 py-0.5 rounded text-[11px] cursor-pointer transition-colors',
-                    filterLifecycle === ls.value ? `${ls.color} font-medium` : 'text-slate-500 hover:bg-slate-100',
+                    !filterLifecycle ? 'bg-botica-100 text-botica-700 font-medium' : 'text-slate-500 hover:bg-slate-100',
                   )}
                 >
-                  {ls.label}
+                  Todos
                 </button>
-              ))}
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-medium text-slate-500">Status:</span>
-              <button
-                onClick={() => setFilterStatus(null)}
-                className={cn(
-                  'px-2 py-0.5 rounded text-[11px] cursor-pointer transition-colors',
-                  !filterStatus ? 'bg-botica-100 text-botica-700 font-medium' : 'text-slate-500 hover:bg-slate-100',
-                )}
-              >
-                Todos
-              </button>
-              {CONTACT_STATUSES.map((s) => (
+                {LIFECYCLE_STAGES.map((ls) => (
+                  <button
+                    key={ls.value}
+                    onClick={() => { setFilterLifecycle(filterLifecycle === ls.value ? null : ls.value); resetPagination() }}
+                    className={cn(
+                      'px-2 py-0.5 rounded text-[11px] cursor-pointer transition-colors',
+                      filterLifecycle === ls.value ? `${ls.color} font-medium` : 'text-slate-500 hover:bg-slate-100',
+                    )}
+                  >
+                    {ls.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Status */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-medium text-slate-500">Status:</span>
                 <button
-                  key={s.value}
-                  onClick={() => { setFilterStatus(filterStatus === s.value ? null : s.value); setNextToken(null); setTokenHistory([null]) }}
+                  onClick={() => { setFilterStatus(null); resetPagination() }}
                   className={cn(
                     'px-2 py-0.5 rounded text-[11px] cursor-pointer transition-colors',
-                    filterStatus === s.value ? `${s.color} font-medium` : 'text-slate-500 hover:bg-slate-100',
+                    !filterStatus ? 'bg-botica-100 text-botica-700 font-medium' : 'text-slate-500 hover:bg-slate-100',
                   )}
                 >
-                  {s.label}
+                  Todos
                 </button>
-              ))}
+                {CONTACT_STATUSES.map((s) => (
+                  <button
+                    key={s.value}
+                    onClick={() => { setFilterStatus(filterStatus === s.value ? null : s.value); resetPagination() }}
+                    className={cn(
+                      'px-2 py-0.5 rounded text-[11px] cursor-pointer transition-colors',
+                      filterStatus === s.value ? `${s.color} font-medium` : 'text-slate-500 hover:bg-slate-100',
+                    )}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Email Status */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-medium text-slate-500">E-mail:</span>
+                <button
+                  onClick={() => { setFilterEmailStatus(null); resetPagination() }}
+                  className={cn(
+                    'px-2 py-0.5 rounded text-[11px] cursor-pointer transition-colors',
+                    !filterEmailStatus ? 'bg-botica-100 text-botica-700 font-medium' : 'text-slate-500 hover:bg-slate-100',
+                  )}
+                >
+                  Todos
+                </button>
+                {EMAIL_STATUSES.map((s) => (
+                  <button
+                    key={s.value}
+                    onClick={() => { setFilterEmailStatus(filterEmailStatus === s.value ? null : s.value); resetPagination() }}
+                    className={cn(
+                      'px-2 py-0.5 rounded text-[11px] cursor-pointer transition-colors',
+                      filterEmailStatus === s.value ? `${s.color} font-medium` : 'text-slate-500 hover:bg-slate-100',
+                    )}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
             </div>
-            <button onClick={handleClearFilters} className="text-[11px] text-slate-400 hover:text-slate-600 cursor-pointer ml-auto">
-              <X className="w-3 h-3 inline mr-0.5" />Limpar
-            </button>
+
+            {/* Tag filter + clear */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <Tag className="w-3 h-3 text-slate-400" />
+                <Input
+                  value={filterTag}
+                  onChange={(e) => { setFilterTag(e.target.value); resetPagination() }}
+                  placeholder="Filtrar por tag..."
+                  className="h-7 text-[11px] w-40"
+                />
+              </div>
+              {activeFilterCount > 0 && (
+                <button onClick={handleClearFilters} className="text-[11px] text-slate-400 hover:text-slate-600 cursor-pointer ml-auto flex items-center gap-0.5">
+                  <X className="w-3 h-3" />Limpar filtros
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -369,26 +430,27 @@ function ContactsListView() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Nome Completo</th>
-                <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">E-mail</th>
+                <SortableHeader label="Nome Completo" field="FULL_NAME" sort={sort} onSort={handleSort} />
+                <SortableHeader label="E-mail" field="EMAIL" sort={sort} onSort={handleSort} />
                 <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider hidden md:table-cell">Telefone</th>
-                <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider hidden lg:table-cell">Lifecycle</th>
-                <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider hidden lg:table-cell">Saldo Cashback</th>
-                <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider hidden lg:table-cell">Status</th>
+                <SortableHeader label="Lifecycle" field="LIFECYCLE_STAGE" sort={sort} onSort={handleSort} className="hidden lg:table-cell" />
+                <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider hidden xl:table-cell">Tags</th>
+                <th className="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider hidden lg:table-cell">Cashback</th>
+                <SortableHeader label="Criado em" field="CREATED_AT" sort={sort} onSort={handleSort} className="hidden xl:table-cell" />
                 <th className="px-4 py-2.5 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-sm text-slate-400">
+                  <td colSpan={8} className="py-12 text-center text-sm text-slate-400">
                     <RefreshCw className="w-4 h-4 animate-spin inline mr-2" />
                     Carregando contatos...
                   </td>
                 </tr>
               ) : contacts.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center">
+                  <td colSpan={8} className="py-12 text-center">
                     <Users className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                     <p className="text-sm text-slate-500">
                       {filter ? 'Nenhum contato encontrado com estes filtros.' : 'Nenhum contato cadastrado.'}
@@ -403,27 +465,32 @@ function ContactsListView() {
               ) : (
                 contacts.map((contact) => {
                   const lifecycle = LIFECYCLE_STAGES.find(l => l.value === contact.lifecycleStage)
-                  const statusInfo = CONTACT_STATUSES.find(s => s.value === contact.status)
                   const cashback = contact.cashbackInfo?.currentBalance ?? 0
 
                   return (
                     <tr
                       key={contact.id}
-                      className="hover:bg-slate-50 transition-colors"
+                      onClick={() => setDetailContact(contact)}
+                      className="hover:bg-botica-50/30 transition-colors cursor-pointer"
                     >
                       <td className="px-4 py-3">
-                        <span className="font-medium text-slate-800">{contact.fullName}</span>
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-botica-100 text-botica-700 flex items-center justify-center text-xs font-bold shrink-0">
+                            {contact.fullName.charAt(0).toUpperCase()}
+                          </div>
+                          <span className="font-medium text-slate-800">{contact.fullName}</span>
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-slate-600">
                         <div className="flex items-center gap-1.5">
-                          <span className="truncate">{contact.email}</span>
+                          <span className="truncate max-w-[200px]">{contact.email}</span>
                           <EmailStatusIcon status={contact.emailStatus} reason={contact.emailFailReason} />
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-slate-500 hidden md:table-cell font-mono text-xs">
+                      <td className="px-4 py-3 text-slate-500 hidden md:table-cell text-xs">
                         {contact.phone ? (
                           <div className="flex items-center gap-1.5">
-                            <span>{contact.phone}</span>
+                            <span>{formatPhone(contact.phone)}</span>
                             <PhoneStatusIcon status={contact.phoneStatus} />
                           </div>
                         ) : '—'}
@@ -433,20 +500,35 @@ function ContactsListView() {
                           <Badge className={cn('text-[11px]', lifecycle.color)}>{lifecycle.label}</Badge>
                         )}
                       </td>
+                      <td className="px-4 py-3 hidden xl:table-cell">
+                        {contact.tags.length > 0 ? (
+                          <div className="flex flex-wrap gap-1 max-w-[160px]">
+                            {contact.tags.slice(0, 3).map((tag) => (
+                              <Badge key={tag} className="text-[10px] bg-slate-100 text-slate-600 px-1.5">{tag}</Badge>
+                            ))}
+                            {contact.tags.length > 3 && (
+                              <Badge className="text-[10px] bg-slate-100 text-slate-500">+{contact.tags.length - 3}</Badge>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-slate-300">—</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 hidden lg:table-cell">
-                        <span className="font-mono text-sm text-slate-700">
+                        <span className="font-mono text-xs text-slate-700">
                           R$ {cashback.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                       </td>
-                      <td className="px-4 py-3 hidden lg:table-cell">
-                        {statusInfo && (
-                          <Badge className={cn('text-[11px]', statusInfo.color)}>{statusInfo.label}</Badge>
-                        )}
+                      <td className="px-4 py-3 hidden xl:table-cell">
+                        <div className="flex items-center gap-1 text-xs text-slate-500">
+                          <Calendar className="w-3 h-3" />
+                          {formatRelativeDate(contact.createdAt)}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={() => handleEdit(contact)}
+                            onClick={(e) => handleEdit(contact, e)}
                             className="p-1.5 rounded-md hover:bg-slate-100 cursor-pointer transition-colors text-slate-400 hover:text-slate-600"
                             title="Editar"
                           >
@@ -454,7 +536,7 @@ function ContactsListView() {
                           </button>
                           {canDelete && (
                             <button
-                              onClick={() => { setDeleteTarget(contact); setDeleteDialogOpen(true) }}
+                              onClick={(e) => { e.stopPropagation(); setDeleteTarget(contact); setDeleteDialogOpen(true) }}
                               className="p-1.5 rounded-md hover:bg-red-50 cursor-pointer transition-colors text-slate-400 hover:text-red-600"
                               title="Excluir"
                             >
@@ -499,6 +581,15 @@ function ContactsListView() {
           </div>
         </div>
       </div>
+
+      {/* Contact Detail Panel */}
+      {detailContact && (
+        <ContactDetailDialog
+          contact={detailContact}
+          open={!!detailContact}
+          onClose={() => setDetailContact(null)}
+        />
+      )}
 
       {/* Form Dialog */}
       <ContactFormDialog
@@ -548,5 +639,35 @@ function ContactsListView() {
         </div>
       )}
     </div>
+  )
+}
+
+// ── Sortable column header ───────────────────────────────────────────────────
+
+function SortableHeader({
+  label, field, sort, onSort, className,
+}: {
+  label: string
+  field: ContactSortInput['field']
+  sort: ContactSortInput
+  onSort: (field: ContactSortInput['field']) => void
+  className?: string
+}) {
+  const isActive = sort.field === field
+  return (
+    <th
+      className={cn(
+        'px-4 py-2.5 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider cursor-pointer hover:text-slate-700 select-none',
+        className,
+      )}
+      onClick={() => onSort(field)}
+    >
+      <span className="flex items-center gap-1">
+        {label}
+        {isActive && (
+          <span className="text-botica-600">{sort.direction === 'ASC' ? '↑' : '↓'}</span>
+        )}
+      </span>
+    </th>
   )
 }

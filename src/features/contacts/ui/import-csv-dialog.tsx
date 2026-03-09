@@ -6,7 +6,7 @@ import { Badge } from '@/shared/ui/badge'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/shared/ui/dialog'
-import { cn } from '@/shared/lib/utils'
+import { cn, formatPhone } from '@/shared/lib/utils'
 import { normalizePhone } from '../api/contacts-api'
 import type { CreateContactInput } from '../types'
 
@@ -186,7 +186,7 @@ export function ImportCsvDialog({ open, onOpenChange, onImport, isPending }: Imp
                         <td className="px-2 py-1 text-slate-400">{i + 1}</td>
                         <td className="px-2 py-1 text-slate-700 max-w-[120px] truncate">{row.fullName}</td>
                         <td className="px-2 py-1 text-slate-700 max-w-[150px] truncate">{row.email}</td>
-                        <td className="px-2 py-1 text-slate-500">{row.phone || '—'}</td>
+                        <td className="px-2 py-1 text-slate-500">{row.phone ? formatPhone(row.phone) : '—'}</td>
                         <td className="px-2 py-1 text-slate-500">{row.lifecycleStage}</td>
                         <td className="px-2 py-1">
                           {row.valid ? (

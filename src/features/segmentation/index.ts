@@ -1,1 +1,1 @@
-export { SegmentationPage } from './ui/segmentation-page'
+export { SegmentationView } from './ui/segmentation-page'

@@ -12,7 +12,6 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/shared/ui/dialog'
 import { cn } from '@/shared/lib/utils'
-import { useAuthStore } from '@/features/auth/store/auth-store'
 import {
   useTemplatesList, useTemplateDetail, useSaveTemplate,
   useDeleteTemplate, useDuplicateTemplate, useSendTestEmail,
@@ -297,7 +296,6 @@ function VersionHistoryDialog({
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export function TemplatesPage({ embedded }: { embedded?: boolean } = {}) {
-  const user = useAuthStore((s) => s.user)
 
   // ── List & detail ──
   const { data: templates = [], isLoading: isListLoading } = useTemplatesList()
@@ -340,7 +338,7 @@ export function TemplatesPage({ embedded }: { embedded?: boolean } = {}) {
   const [duplicateNewName, setDuplicateNewName] = useState('')
   const [duplicateSource, setDuplicateSource] = useState<string | null>(null)
   const [testEmailDialog, setTestEmailDialog] = useState(false)
-  const [testEmailAddress, setTestEmailAddress] = useState(user?.email ?? '')
+  const [testEmailAddress, setTestEmailAddress] = useState('')
   const [testConfigSet, setTestConfigSet] = useState('')
   const [testSender, setTestSender] = useState('')
   const [versionHistoryDialog, setVersionHistoryDialog] = useState(false)
@@ -505,6 +503,7 @@ export function TemplatesPage({ embedded }: { embedded?: boolean } = {}) {
         testData: testDataJson !== '{}' ? testDataJson : undefined,
         configurationSet: configSet,
         fromAddress: fromAddr,
+        tags: JSON.stringify({ campanha: 'Teste_de_Envio' }),
       })
       setTestEmailDialog(false)
       showToast('E-mail de teste enviado!')

@@ -471,3 +471,19 @@ export function response(ctx) {
 3. **Condition Expressions**: `pauseCampaign` e `cancelCampaign` usam condition expressions para garantir transições de status válidas (ex: só pode pausar se estiver `sending` ou `scheduled`).
 
 4. **Metrics**: As métricas iniciais são zeradas no `createCampaign`. A atualização das métricas reais deve ser feita por eventos SNS/SES → Lambda → DynamoDB (via SES event notifications no Configuration Set).
+
+5. **SES Tags (Message Tags)**:
+   - **Restrição SES**: Tag names e values só aceitam caracteres ASCII alfanuméricos + `_`, `-`, `.`, `@`. Sem espaços, sem acentos.
+   - **E-mail de teste** (`sendTestEmail`): O frontend envia `tags: '{"campanha":"Teste_de_Envio"}'`. A Lambda deve sanitizar os valores antes de enviar ao SES.
+   - **Envio de campanha** (`sendCampaign`): A Lambda de envio deve incluir `Tags: [{ Name: "campanha", Value: sanitize(campaign.name) }]` em cada chamada SES.
+   - **Função de sanitização** para a Lambda:
+     ```javascript
+     function sanitizeSesTagValue(value) {
+       return value
+         .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
+         .replace(/\s+/g, '_')                              // espaços → _
+         .replace(/[^a-zA-Z0-9_\-\.@]/g, '')               // remove chars inválidos
+         .slice(0, 256);                                     // limite SES
+     }
+     ```
+   - O campo `tags` é do tipo `AWSJSON` (string JSON com pares chave-valor). Exemplo: `{"campanha":"Black_Friday_2025","tipo":"promocional"}`.

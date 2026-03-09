@@ -6,7 +6,7 @@ import { Label } from '@/shared/ui/label'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/shared/ui/dialog'
-import { cn } from '@/shared/lib/utils'
+import { cn, formatPhone } from '@/shared/lib/utils'
 import { normalizePhone } from '../api/contacts-api'
 import { LIFECYCLE_STAGES, CONTACT_STATUSES, EMAIL_STATUSES, PHONE_STATUSES } from '../types'
 import type { Contact, CreateContactInput, UpdateContactInput } from '../types'
@@ -123,7 +123,7 @@ export function ContactFormDialog({ open, onOpenChange, contact, onSave, isPendi
               <Input id="cf-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="mt-1" />
               {phone.trim() && (
                 <p className="text-[10px] text-slate-400 mt-0.5">
-                  Normalizado: {normalizePhone(phone.trim())}
+                  {formatPhone(normalizePhone(phone.trim()))}
                 </p>
               )}
             </div>

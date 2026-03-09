@@ -7,6 +7,8 @@ import type {
   ContactFilterInput,
   ContactSortInput,
   ImportResult,
+  ContactEventListResult,
+  ContactEventFilterInput,
 } from '../types'
 
 const client = generateClient()
@@ -33,6 +35,16 @@ const CONTACT_FIELDS = /* GraphQL */ `
     emailStatus
     emailFailReason
     phoneStatus
+    stats {
+      emailSends
+      emailDeliveries
+      emailOpens
+      emailClicks
+      emailBounces
+      emailComplaints
+      smsSends
+      smsDeliveries
+    }
     createdBy
     updatedBy
   }
@@ -146,4 +158,47 @@ export function normalizePhone(raw: string): string {
   if (digits.startsWith('55') && digits.length >= 12) return `+${digits}`
   if (digits.length === 10 || digits.length === 11) return `+55${digits}`
   return raw.trim()
+}
+
+// ── Contact Events ───────────────────────────────────────────────────────────
+
+const EVENT_FIELDS = /* GraphQL */ `
+  fragment EventFields on ContactEvent {
+    contactId
+    eventId
+    channel
+    eventType
+    details
+    campaignId
+    campaignName
+    subject
+    createdAt
+  }
+`
+
+export async function listContactEvents(
+  contactId: string,
+  limit?: number,
+  nextToken?: string | null,
+  filter?: ContactEventFilterInput | null,
+): Promise<ContactEventListResult> {
+  const query = /* GraphQL */ `
+    ${EVENT_FIELDS}
+    query ListContactEvents($contactId: ID!, $limit: Int, $nextToken: String, $filter: ContactEventFilterInput) {
+      listContactEvents(contactId: $contactId, limit: $limit, nextToken: $nextToken, filter: $filter) {
+        items { ...EventFields }
+        nextToken
+      }
+    }
+  `
+  const { data } = await client.graphql({
+    query,
+    variables: {
+      contactId,
+      limit: limit ?? 30,
+      nextToken: nextToken ?? null,
+      filter: filter ?? null,
+    },
+  }) as { data: { listContactEvents: ContactEventListResult } }
+  return data.listContactEvents
 }

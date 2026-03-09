@@ -136,17 +136,18 @@ export async function sendTestEmail(
   testData?: string,
   configurationSet?: string,
   fromAddress?: string,
+  tags?: string,
 ): Promise<{ messageId: string }> {
   const mutation = /* GraphQL */ `
-    mutation SendTestEmail($templateName: String!, $toAddress: String!, $fromAddress: String, $testData: AWSJSON, $configurationSet: String) {
-      sendTestEmail(templateName: $templateName, toAddress: $toAddress, fromAddress: $fromAddress, testData: $testData, configurationSet: $configurationSet) {
+    mutation SendTestEmail($templateName: String!, $toAddress: String!, $fromAddress: String, $testData: AWSJSON, $configurationSet: String, $tags: AWSJSON) {
+      sendTestEmail(templateName: $templateName, toAddress: $toAddress, fromAddress: $fromAddress, testData: $testData, configurationSet: $configurationSet, tags: $tags) {
         messageId
       }
     }
   `
   const { data } = await client.graphql({
     query: mutation,
-    variables: { templateName, toAddress, fromAddress, testData, configurationSet },
+    variables: { templateName, toAddress, fromAddress, testData, configurationSet, tags },
   }) as { data: { sendTestEmail: { messageId: string } } }
   return data.sendTestEmail
 }
