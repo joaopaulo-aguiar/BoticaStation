@@ -169,6 +169,8 @@ export function ContactDetailDialog({ contact, open, onClose }: ContactDetailDia
     hasNextPage,
     fetchNextPage,
     isFetchingNextPage,
+    refetch: refetchEvents,
+    isRefetching: isRefetchingEvents,
   } = useContactEvents(contact.id, filter)
 
   const events = useMemo(
@@ -311,10 +313,22 @@ export function ContactDetailDialog({ contact, open, onClose }: ContactDetailDia
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Stats */}
             <div className="px-5 pt-4 pb-3 border-b border-slate-100">
-              <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-                <Mail className="w-4 h-4 text-botica-600" />
-                Atividade — {contact.fullName}
-              </h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                  <Mail className="w-4 h-4 text-botica-600" />
+                  Atividade — {contact.fullName}
+                </h3>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => refetchEvents()}
+                  disabled={isRefetchingEvents}
+                  className="h-7 text-xs"
+                >
+                  <RefreshCw className={cn('w-3 h-3 mr-1', isRefetchingEvents && 'animate-spin')} />
+                  Atualizar
+                </Button>
+              </div>
               <StatsBar stats={contact.stats} />
             </div>
 

@@ -110,13 +110,40 @@ function scheduleName(campaignId) {
 }
 
 /**
- * Convert ISO 8601 datetime to EventBridge at() expression.
+ * Convert ISO 8601 datetime to EventBridge at() expression in the given timezone.
  * EventBridge expects: at(yyyy-MM-ddTHH:mm:ss)
+ *
+ * Uses manual UTC→local conversion via Intl.DateTimeFormat.formatToParts().
+ * This avoids any locale/runtime dependency issues in Lambda.
  */
-function toAtExpression(isoDate) {
-  const d = new Date(isoDate);
+function toAtExpression(isoDate, timezone) {
+  const utcMs = new Date(isoDate).getTime();
+  const tz = timezone || 'America/Sao_Paulo';
+
+  // Use a known reference to compute the UTC offset for the target timezone
+  // by comparing the formatted local components to the actual UTC time.
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    year: 'numeric', month: 'numeric', day: 'numeric',
+    hour: 'numeric', minute: 'numeric', second: 'numeric',
+    hour12: false,
+  });
+  const parts = fmt.formatToParts(new Date(utcMs));
+  const g = (t) => parseInt(parts.find(p => p.type === t)?.value ?? '0', 10);
   const pad = (n) => String(n).padStart(2, '0');
-  return `at(${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())})`;
+
+  const year = g('year');
+  const month = pad(g('month'));
+  const day = pad(g('day'));
+  // Intl may return hour=24 for midnight; normalize to 0
+  const rawHour = g('hour');
+  const hour = pad(rawHour === 24 ? 0 : rawHour);
+  const minute = pad(g('minute'));
+  const second = pad(g('second'));
+
+  const expr = `at(${year}-${month}-${day}T${hour}:${minute}:${second})`;
+  console.log(`toAtExpression: ${isoDate} → ${expr} (tz=${tz})`);
+  return expr;
 }
 
 // ── Operations ───────────────────────────────────────────────────────────────
@@ -128,15 +155,16 @@ async function scheduleCampaign(id, scheduledAt, caller) {
 
   const settings = await getCampaignSettings();
   const group = settings.scheduleGroupName || SCHEDULE_GROUP;
+  const timezone = settings.timezone || 'America/Sao_Paulo';
 
   const name = scheduleName(id);
-  const scheduleExpression = toAtExpression(scheduledAt);
+  const scheduleExpression = toAtExpression(scheduledAt, timezone);
 
   await scheduler.send(new CreateScheduleCommand({
     Name: name,
     GroupName: group,
     ScheduleExpression: scheduleExpression,
-    ScheduleExpressionTimezone: 'UTC',
+    ScheduleExpressionTimezone: timezone,
     FlexibleTimeWindow: { Mode: 'OFF' },
     State: 'ENABLED',
     Target: {
@@ -147,8 +175,11 @@ async function scheduleCampaign(id, scheduledAt, caller) {
     ActionAfterCompletion: 'DELETE',
   }));
 
-  // Build schedule ARN
-  const scheduleArn = `arn:aws:scheduler:${REGION}:${process.env.AWS_ACCOUNT_ID || '176322301236'}:schedule/${group}/${name}`;
+  // Build schedule ARN (derive account ID from Lambda context env)
+  const accountId = process.env.AWS_ACCOUNT_ID
+    || (TARGET_LAMBDA_ARN.match(/:([0-9]{12}):/)?.[1])
+    || '176322301236';
+  const scheduleArn = `arn:aws:scheduler:${REGION}:${accountId}:schedule/${group}/${name}`;
 
   return updateCampaignStatus(id, {
     status: 'scheduled',
@@ -164,6 +195,7 @@ async function rescheduleCampaign(id, scheduledAt, caller) {
 
   const settings = await getCampaignSettings();
   const group = settings.scheduleGroupName || SCHEDULE_GROUP;
+  const timezone = settings.timezone || 'America/Sao_Paulo';
   const name = scheduleName(id);
 
   // Fetch current schedule to get TargetArn and RoleArn
@@ -183,8 +215,8 @@ async function rescheduleCampaign(id, scheduledAt, caller) {
   await scheduler.send(new UpdateScheduleCommand({
     Name: name,
     GroupName: group,
-    ScheduleExpression: toAtExpression(scheduledAt),
-    ScheduleExpressionTimezone: 'UTC',
+    ScheduleExpression: toAtExpression(scheduledAt, timezone),
+    ScheduleExpressionTimezone: timezone,
     FlexibleTimeWindow: { Mode: 'OFF' },
     State: 'ENABLED',
     Target: existingSchedule.Target,

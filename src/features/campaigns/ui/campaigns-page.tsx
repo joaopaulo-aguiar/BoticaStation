@@ -36,7 +36,7 @@ import {
   useUpdateCampaignSettings,
 } from '../hooks/use-campaigns'
 import { useTemplatesList } from '@/features/templates/hooks/use-templates'
-import { useSenderProfiles } from '@/features/settings/hooks/use-settings'
+import { useSenderProfiles, useDefaultConfigurationSet } from '@/features/settings/hooks/use-settings'
 import { useSegmentsList } from '@/features/segmentation/hooks/use-segments'
 import { TemplatesPage } from '@/features/templates'
 import {
@@ -832,6 +832,7 @@ function CampaignFormDialog({ open, onClose, editCampaign, campaigns, showToast 
   const { data: segments = [] } = useSegmentsList()
   const { data: campaignSettings } = useCampaignSettings()
   const { data: tags = [] } = useCampaignTags()
+  const { data: defaultConfigSet } = useDefaultConfigurationSet()
 
   const createCampaign = useCreateCampaign()
   const updateCampaign = useUpdateCampaign()
@@ -891,6 +892,7 @@ function CampaignFormDialog({ open, onClose, editCampaign, campaigns, showToast 
         segmentId: form.recipientType === 'segment' ? form.segmentId || null : null,
         campaignTags: form.campaignTags.length ? form.campaignTags : null,
         utmParams: utmJson,
+        configurationSet: defaultConfigSet || null,
       }
 
       if (editCampaign) {
@@ -1304,6 +1306,7 @@ function CampaignListView({ showToast }: { showToast: (msg: string, type?: 'succ
   const [formDialog, setFormDialog] = useState(false)
   const [editCampaign, setEditCampaign] = useState<Campaign | null>(null)
   const [deleteDialog, setDeleteDialog] = useState<Campaign | null>(null)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
 
   const filteredCampaigns = useMemo(() => {
     let result = campaigns
@@ -1406,6 +1409,7 @@ function CampaignListView({ showToast }: { showToast: (msg: string, type?: 'succ
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-32">Criada em</TableHead>
               <TableHead className="max-w-[200px]">Campanha</TableHead>
               <TableHead className="w-36">Agendamento</TableHead>
               <TableHead className="w-20 text-right">Envios</TableHead>
@@ -1425,7 +1429,10 @@ function CampaignListView({ showToast }: { showToast: (msg: string, type?: 'succ
               const bounceRate = m && m.sent > 0 ? ((m.bounced / m.sent) * 100) : null
               const unsubRate = m && m.delivered > 0 ? ((m.unsubscribed / m.delivered) * 100) : null
               return (
-                <TableRow key={c.id}>
+                <TableRow key={c.id} className={cn(actionLoading === c.id && 'opacity-50 pointer-events-none')}>
+                  <TableCell>
+                    <span className="text-[11px] text-slate-500 whitespace-nowrap">{formatDateBR(c.createdAt)}</span>
+                  </TableCell>
                   <TableCell className="max-w-[200px]">
                     <div className="flex items-start gap-2">
                       <div className="min-w-0">
@@ -1549,35 +1556,45 @@ function CampaignListView({ showToast }: { showToast: (msg: string, type?: 'succ
                       campaign={c}
                       onEdit={() => handleEdit(c)}
                       onDuplicate={async () => {
+                        setActionLoading(c.id)
                         try {
                           await duplicateCampaign.mutateAsync(c.id)
                           showToast('Campanha duplicada')
                         } catch { showToast('Erro ao duplicar', 'error') }
+                        finally { setActionLoading(null) }
                       }}
                       onDelete={() => setDeleteDialog(c)}
                       onSend={async () => {
+                        setActionLoading(c.id)
                         try {
                           await sendCampaign.mutateAsync(c.id)
                           showToast('Campanha enviada')
                         } catch { showToast('Erro ao enviar', 'error') }
+                        finally { setActionLoading(null) }
                       }}
                       onPause={async () => {
+                        setActionLoading(c.id)
                         try {
                           await pauseCampaign.mutateAsync(c.id)
                           showToast('Campanha pausada')
                         } catch { showToast('Erro ao pausar', 'error') }
+                        finally { setActionLoading(null) }
                       }}
                       onResume={async () => {
+                        setActionLoading(c.id)
                         try {
                           await resumeCampaign.mutateAsync(c.id)
                           showToast('Campanha retomada')
                         } catch { showToast('Erro ao retomar', 'error') }
+                        finally { setActionLoading(null) }
                       }}
                       onCancel={async () => {
+                        setActionLoading(c.id)
                         try {
                           await cancelCampaign.mutateAsync(c.id)
                           showToast('Campanha cancelada')
                         } catch { showToast('Erro ao cancelar', 'error') }
+                        finally { setActionLoading(null) }
                       }}
                     />
                   </TableCell>
