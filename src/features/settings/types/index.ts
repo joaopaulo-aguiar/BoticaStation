@@ -57,3 +57,19 @@ export interface UpdateUserInput {
   name?: string
   enabled?: boolean
 }
+
+// ── Campaign Settings (EventBridge Scheduler) ────────────────────────────────
+
+export interface CampaignSettings {
+  timezone: string
+  scheduleGroupName: string
+  defaultUtmSource: string | null
+  defaultUtmMedium: string | null
+}
+
+export interface UpdateCampaignSettingsInput {
+  timezone?: string | null
+  scheduleGroupName?: string | null
+  defaultUtmSource?: string | null
+  defaultUtmMedium?: string | null
+}

@@ -503,7 +503,7 @@ export function TemplatesPage({ embedded }: { embedded?: boolean } = {}) {
         testData: testDataJson !== '{}' ? testDataJson : undefined,
         configurationSet: configSet,
         fromAddress: fromAddr,
-        tags: JSON.stringify({ campanha: 'Teste_de_Envio' }),
+        tags: JSON.stringify({ campanha: 'Teste de Envio' }),
       })
       setTestEmailDialog(false)
       showToast('E-mail de teste enviado!')

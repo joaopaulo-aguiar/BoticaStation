@@ -1,7 +1,8 @@
 # AppSync — Resolvers DynamoDB Direto (Campaigns)
 
 > Integração direta AppSync ↔ DynamoDB via **JS Resolvers** (runtime `APPSYNC_JS 1.0.0`).
-> Sem Lambda (exceto `sendCampaign` que requer Lambda para orquestrar envio SES).
+> Operações CRUD básicas de campanhas (create, update, list, get).
+> Para operações de agendamento (schedule, pause, resume, cancel, delete, duplicate), veja `appsync-eventbridge-resolvers.md`.
 > Cada campo do schema recebe um resolver com request/response handler.
 
 ---
@@ -11,7 +12,7 @@
 - **Tabela DynamoDB**: `Config_Table`
 - **Data Source no AppSync**: Usar o data source existente do tipo **DynamoDB** apontando para `Config_Table`, com role IAM que permita `dynamodb:GetItem`, `PutItem`, `UpdateItem`, `DeleteItem`, `Query`.
 - **Nome do Data Source**: usar `ConfigTable` (referenciado abaixo).
-- **Para sendCampaign**: Criar data source do tipo **Lambda** apontando para a função de envio de campanhas.
+- **Para schedule/pause/resume/cancel/delete/duplicate**: Veja `appsync-eventbridge-resolvers.md` — usam Lambda `CampaignSchedulerLambda`.
 
 ---
 
@@ -26,12 +27,20 @@
 | subject | String | Assunto do e-mail |
 | templateName | String | Nome do template SES |
 | senderProfileId | String | ID do perfil de remetente |
-| recipientFilter | String | Filtro de destinatários (JSON) |
+| recipientType | String | `all` / `lifecycleStage` / `segment` |
+| recipientFilter | String | Valor do filtro (ex: `lead`, `customer`) — nullable |
+| segmentId | String | ID do segmento (quando recipientType = `segment`) — nullable |
 | status | String | `draft` / `scheduled` / `sending` / `sent` / `paused` / `cancelled` |
 | scheduledAt | String | ISO 8601 (nullable) |
 | sentAt | String | ISO 8601 (nullable) |
+| completedAt | String | ISO 8601 (nullable) |
 | metrics | Map | `{ sent, delivered, opened, clicked, bounced, complained, unsubscribed }` |
 | configurationSet | String | Nome do Configuration Set SES (nullable) |
+| scheduleArn | String | ARN do schedule no EventBridge (nullable) |
+| timezone | String | Fuso horário do agendamento (nullable) |
+| campaignTags | List | Lista de tags/labels da campanha (nullable) |
+| utmParams | String | AWSJSON com parâmetros UTM (nullable) |
+| estimatedRecipients | Number | Contagem estimada de destinatários (nullable) |
 | createdAt | String | ISO 8601 |
 | updatedAt | String | ISO 8601 |
 | createdBy | String | Cognito sub/email |
@@ -125,10 +134,13 @@ export function request(ctx) {
     subject: input.subject,
     templateName: input.templateName,
     senderProfileId: input.senderProfileId,
+    recipientType: input.recipientType ?? 'all',
     recipientFilter: input.recipientFilter ?? null,
+    segmentId: input.segmentId ?? null,
     status: 'draft',
     scheduledAt: input.scheduledAt ?? null,
     sentAt: null,
+    completedAt: null,
     metrics: {
       sent: 0,
       delivered: 0,
@@ -139,6 +151,11 @@ export function request(ctx) {
       unsubscribed: 0,
     },
     configurationSet: input.configurationSet ?? null,
+    scheduleArn: null,
+    timezone: null,
+    campaignTags: input.campaignTags ?? null,
+    utmParams: input.utmParams ?? null,
+    estimatedRecipients: null,
     createdAt: now,
     updatedAt: now,
     createdBy: caller,
@@ -219,6 +236,26 @@ export function request(ctx) {
     expNames['#configurationSet'] = 'configurationSet';
     Object.assign(expValues, util.dynamodb.toMapValues({ ':configurationSet': input.configurationSet }));
   }
+  if (input.recipientType != null) {
+    expParts.push('#recipientType = :recipientType');
+    expNames['#recipientType'] = 'recipientType';
+    Object.assign(expValues, util.dynamodb.toMapValues({ ':recipientType': input.recipientType }));
+  }
+  if (input.segmentId !== undefined) {
+    expParts.push('#segmentId = :segmentId');
+    expNames['#segmentId'] = 'segmentId';
+    Object.assign(expValues, util.dynamodb.toMapValues({ ':segmentId': input.segmentId }));
+  }
+  if (input.campaignTags !== undefined) {
+    expParts.push('#campaignTags = :campaignTags');
+    expNames['#campaignTags'] = 'campaignTags';
+    Object.assign(expValues, util.dynamodb.toMapValues({ ':campaignTags': input.campaignTags }));
+  }
+  if (input.utmParams !== undefined) {
+    expParts.push('#utmParams = :utmParams');
+    expNames['#utmParams'] = 'utmParams';
+    Object.assign(expValues, util.dynamodb.toMapValues({ ':utmParams': input.utmParams }));
+  }
 
   return {
     operation: 'UpdateItem',
@@ -254,192 +291,29 @@ export function response(ctx) {
 
 ## 5. deleteCampaign
 
-**Schema**: `deleteCampaign(id: ID!): Boolean!`
-**Data Source**: `ConfigTable`
-
-### Request Handler
-```javascript
-import { util } from '@aws-appsync/utils';
-
-export function request(ctx) {
-  return {
-    operation: 'DeleteItem',
-    key: util.dynamodb.toMapValues({
-      PK: 'CAMPAIGN',
-      SK: `CAMPAIGN#${ctx.args.id}`,
-    }),
-    condition: {
-      expression: 'attribute_exists(PK)',
-    },
-  };
-}
-```
-
-### Response Handler
-```javascript
-import { util } from '@aws-appsync/utils';
-
-export function response(ctx) {
-  if (ctx.error) {
-    util.error(ctx.error.message, ctx.error.type);
-  }
-  return true;
-}
-```
+> ⚠️ **MIGRADO PARA LAMBDA** — Veja `appsync-eventbridge-resolvers.md`.
+> A operação de delete agora usa `CampaignSchedulerLambda` para também remover o schedule do EventBridge.
 
 ---
 
 ## 6. sendCampaign
 
-**Schema**: `sendCampaign(id: ID!): Campaign!`
-**Data Source**: `SendCampaignLambda` (Lambda)
-
-> ⚠️ Esta mutation requer uma **Lambda** pois precisa:
-> 1. Buscar a campanha no DynamoDB
-> 2. Buscar os contatos pelo filtro
-> 3. Enviar e-mails via SES usando o template e configuration set
-> 4. Atualizar o status da campanha para `sending`
->
-> Alternativamente, pode usar **Pipeline Resolver** com dois steps DynamoDB
-> (get campaign → update status) e um step Lambda (envio SES).
-
-### Request Handler
-```javascript
-import { util } from '@aws-appsync/utils';
-
-export function request(ctx) {
-  return {
-    operation: 'Invoke',
-    payload: {
-      field: 'sendCampaign',
-      arguments: ctx.args,
-      identity: ctx.identity,
-    },
-  };
-}
-```
-
-### Response Handler
-```javascript
-import { util } from '@aws-appsync/utils';
-
-export function response(ctx) {
-  if (ctx.error) {
-    util.error(ctx.error.message, ctx.error.type);
-  }
-  return ctx.result;
-}
-```
+> ⚠️ **MIGRADO PARA LAMBDA** — Veja `appsync-eventbridge-resolvers.md`.
+> Agora cria um schedule imediato (+5s) no EventBridge em vez de enviar diretamente.
 
 ---
 
 ## 7. pauseCampaign
 
-**Schema**: `pauseCampaign(id: ID!): Campaign!`
-**Data Source**: `ConfigTable`
-
-> Atualiza o status para `paused`. Só permite pausar campanhas com status `sending` ou `scheduled`.
-
-### Request Handler
-```javascript
-import { util } from '@aws-appsync/utils';
-
-export function request(ctx) {
-  const now = util.time.nowISO8601();
-
-  return {
-    operation: 'UpdateItem',
-    key: util.dynamodb.toMapValues({
-      PK: 'CAMPAIGN',
-      SK: `CAMPAIGN#${ctx.args.id}`,
-    }),
-    update: {
-      expression: 'SET #status = :status, #updatedAt = :updatedAt',
-      expressionNames: {
-        '#status': 'status',
-        '#updatedAt': 'updatedAt',
-      },
-      expressionValues: util.dynamodb.toMapValues({
-        ':status': 'paused',
-        ':updatedAt': now,
-        ':sending': 'sending',
-        ':scheduled': 'scheduled',
-      }),
-    },
-    condition: {
-      expression: 'attribute_exists(PK) AND (#status = :sending OR #status = :scheduled)',
-      expressionNames: { '#status': 'status' },
-    },
-  };
-}
-```
-
-### Response Handler
-```javascript
-import { util } from '@aws-appsync/utils';
-
-export function response(ctx) {
-  if (ctx.error) {
-    util.error(ctx.error.message, ctx.error.type);
-  }
-  return ctx.result;
-}
-```
+> ⚠️ **MIGRADO PARA LAMBDA** — Veja `appsync-eventbridge-resolvers.md`.
+> Agora pausa o schedule no EventBridge.
 
 ---
 
 ## 8. cancelCampaign
 
-**Schema**: `cancelCampaign(id: ID!): Campaign!`
-**Data Source**: `ConfigTable`
-
-> Atualiza o status para `cancelled`. Só permite cancelar campanhas que não estejam `sent` ou `cancelled`.
-
-### Request Handler
-```javascript
-import { util } from '@aws-appsync/utils';
-
-export function request(ctx) {
-  const now = util.time.nowISO8601();
-
-  return {
-    operation: 'UpdateItem',
-    key: util.dynamodb.toMapValues({
-      PK: 'CAMPAIGN',
-      SK: `CAMPAIGN#${ctx.args.id}`,
-    }),
-    update: {
-      expression: 'SET #status = :status, #updatedAt = :updatedAt',
-      expressionNames: {
-        '#status': 'status',
-        '#updatedAt': 'updatedAt',
-      },
-      expressionValues: util.dynamodb.toMapValues({
-        ':status': 'cancelled',
-        ':updatedAt': now,
-        ':sent': 'sent',
-        ':cancelled': 'cancelled',
-      }),
-    },
-    condition: {
-      expression: 'attribute_exists(PK) AND #status <> :sent AND #status <> :cancelled',
-      expressionNames: { '#status': 'status' },
-    },
-  };
-}
-```
-
-### Response Handler
-```javascript
-import { util } from '@aws-appsync/utils';
-
-export function response(ctx) {
-  if (ctx.error) {
-    util.error(ctx.error.message, ctx.error.type);
-  }
-  return ctx.result;
-}
-```
+> ⚠️ **MIGRADO PARA LAMBDA** — Veja `appsync-eventbridge-resolvers.md`.
+> Agora remove o schedule do EventBridge.
 
 ---
 
@@ -451,10 +325,18 @@ export function response(ctx) {
 | getCampaign | ConfigTable | DynamoDB |
 | createCampaign | ConfigTable | DynamoDB |
 | updateCampaign | ConfigTable | DynamoDB |
-| deleteCampaign | ConfigTable | DynamoDB |
-| sendCampaign | SendCampaignLambda | Lambda |
-| pauseCampaign | ConfigTable | DynamoDB |
-| cancelCampaign | ConfigTable | DynamoDB |
+| deleteCampaign | CampaignSchedulerLambda | Lambda ⚠️ |
+| scheduleCampaign | CampaignSchedulerLambda | Lambda |
+| rescheduleCampaign | CampaignSchedulerLambda | Lambda |
+| sendCampaign | CampaignSchedulerLambda | Lambda |
+| pauseCampaign | CampaignSchedulerLambda | Lambda ⚠️ |
+| resumeCampaign | CampaignSchedulerLambda | Lambda |
+| cancelCampaign | CampaignSchedulerLambda | Lambda ⚠️ |
+| duplicateCampaign | CampaignSchedulerLambda | Lambda |
+| getCampaignSettings | ConfigTable | DynamoDB |
+| updateCampaignSettings | ConfigTable | DynamoDB |
+
+> Veja `appsync-eventbridge-resolvers.md` para os resolvers Lambda.
 
 ---
 

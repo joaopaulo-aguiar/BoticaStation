@@ -1,5 +1,5 @@
 import { generateClient } from 'aws-amplify/api'
-import type { Campaign, CreateCampaignInput, UpdateCampaignInput } from '../types'
+import type { Campaign, CreateCampaignInput, UpdateCampaignInput, CampaignSettings, UpdateCampaignSettingsInput, CampaignTag, CreateTagInput, UpdateTagInput } from '../types'
 
 const client = generateClient()
 
@@ -9,10 +9,13 @@ const CAMPAIGN_FIELDS = /* GraphQL */ `
   subject
   templateName
   senderProfileId
+  recipientType
   recipientFilter
+  segmentId
   status
   scheduledAt
   sentAt
+  completedAt
   metrics {
     sent
     delivered
@@ -23,6 +26,11 @@ const CAMPAIGN_FIELDS = /* GraphQL */ `
     unsubscribed
   }
   configurationSet
+  scheduleArn
+  timezone
+  campaignTags
+  utmParams
+  estimatedRecipients
   createdAt
   updatedAt
   createdBy
@@ -52,6 +60,21 @@ export async function getCampaign(id: string): Promise<Campaign> {
   `
   const { data } = await client.graphql({ query, variables: { id } }) as { data: { getCampaign: Campaign } }
   return data.getCampaign
+}
+
+export async function getCampaignSettings(): Promise<CampaignSettings> {
+  const query = /* GraphQL */ `
+    query GetCampaignSettings {
+      getCampaignSettings {
+        timezone
+        scheduleGroupName
+        defaultUtmSource
+        defaultUtmMedium
+      }
+    }
+  `
+  const { data } = await client.graphql({ query }) as { data: { getCampaignSettings: CampaignSettings } }
+  return data.getCampaignSettings
 }
 
 // ── Mutations ────────────────────────────────────────────────────────────────
@@ -124,4 +147,125 @@ export async function cancelCampaign(id: string): Promise<Campaign> {
   `
   const { data } = await client.graphql({ query: mutation, variables: { id } }) as { data: { cancelCampaign: Campaign } }
   return data.cancelCampaign
+}
+
+// ── Schedule Management ──────────────────────────────────────────────────────
+
+export async function scheduleCampaign(id: string, scheduledAt: string): Promise<Campaign> {
+  const mutation = /* GraphQL */ `
+    mutation ScheduleCampaign($id: ID!, $scheduledAt: AWSDateTime!) {
+      scheduleCampaign(id: $id, scheduledAt: $scheduledAt) {
+        ${CAMPAIGN_FIELDS}
+      }
+    }
+  `
+  const { data } = await client.graphql({ query: mutation, variables: { id, scheduledAt } }) as { data: { scheduleCampaign: Campaign } }
+  return data.scheduleCampaign
+}
+
+export async function rescheduleCampaign(id: string, scheduledAt: string): Promise<Campaign> {
+  const mutation = /* GraphQL */ `
+    mutation RescheduleCampaign($id: ID!, $scheduledAt: AWSDateTime!) {
+      rescheduleCampaign(id: $id, scheduledAt: $scheduledAt) {
+        ${CAMPAIGN_FIELDS}
+      }
+    }
+  `
+  const { data } = await client.graphql({ query: mutation, variables: { id, scheduledAt } }) as { data: { rescheduleCampaign: Campaign } }
+  return data.rescheduleCampaign
+}
+
+export async function resumeCampaign(id: string): Promise<Campaign> {
+  const mutation = /* GraphQL */ `
+    mutation ResumeCampaign($id: ID!) {
+      resumeCampaign(id: $id) {
+        ${CAMPAIGN_FIELDS}
+      }
+    }
+  `
+  const { data } = await client.graphql({ query: mutation, variables: { id } }) as { data: { resumeCampaign: Campaign } }
+  return data.resumeCampaign
+}
+
+export async function duplicateCampaign(id: string): Promise<Campaign> {
+  const mutation = /* GraphQL */ `
+    mutation DuplicateCampaign($id: ID!) {
+      duplicateCampaign(id: $id) {
+        ${CAMPAIGN_FIELDS}
+      }
+    }
+  `
+  const { data } = await client.graphql({ query: mutation, variables: { id } }) as { data: { duplicateCampaign: Campaign } }
+  return data.duplicateCampaign
+}
+
+export async function updateCampaignSettings(input: UpdateCampaignSettingsInput): Promise<CampaignSettings> {
+  const mutation = /* GraphQL */ `
+    mutation UpdateCampaignSettings($input: UpdateCampaignSettingsInput!) {
+      updateCampaignSettings(input: $input) {
+        timezone
+        scheduleGroupName
+        defaultUtmSource
+        defaultUtmMedium
+      }
+    }
+  `
+  const { data } = await client.graphql({ query: mutation, variables: { input } }) as { data: { updateCampaignSettings: CampaignSettings } }
+  return data.updateCampaignSettings
+}
+
+// ── Campaign Tags ────────────────────────────────────────────────────────────
+
+const TAG_FIELDS = /* GraphQL */ `
+  id
+  name
+  color
+  createdAt
+  updatedAt
+`
+
+export async function listCampaignTags(): Promise<CampaignTag[]> {
+  const query = /* GraphQL */ `
+    query ListCampaignTags {
+      listCampaignTags {
+        ${TAG_FIELDS}
+      }
+    }
+  `
+  const { data } = await client.graphql({ query }) as { data: { listCampaignTags: CampaignTag[] } }
+  return data.listCampaignTags ?? []
+}
+
+export async function createCampaignTag(input: CreateTagInput): Promise<CampaignTag> {
+  const mutation = /* GraphQL */ `
+    mutation CreateCampaignTag($input: CreateCampaignTagInput!) {
+      createCampaignTag(input: $input) {
+        ${TAG_FIELDS}
+      }
+    }
+  `
+  const { data } = await client.graphql({ query: mutation, variables: { input } }) as { data: { createCampaignTag: CampaignTag } }
+  return data.createCampaignTag
+}
+
+export async function updateCampaignTag(id: string, input: UpdateTagInput): Promise<CampaignTag> {
+  const mutation = /* GraphQL */ `
+    mutation UpdateCampaignTag($id: ID!, $input: UpdateCampaignTagInput!) {
+      updateCampaignTag(id: $id, input: $input) {
+        ${TAG_FIELDS}
+      }
+    }
+  `
+  const { data } = await client.graphql({ query: mutation, variables: { id, input } }) as { data: { updateCampaignTag: CampaignTag } }
+  return data.updateCampaignTag
+}
+
+export async function deleteCampaignTag(id: string): Promise<boolean> {
+  const mutation = /* GraphQL */ `
+    mutation DeleteCampaignTag($id: ID!) {
+      deleteCampaignTag(id: $id)
+    }
+  `
+  const { data } = await client.graphql({ query: mutation, variables: { id } }) as { data: { deleteCampaignTag: boolean } }
+  return data.deleteCampaignTag
 }

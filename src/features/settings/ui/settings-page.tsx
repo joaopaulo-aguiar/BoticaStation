@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import {
   Settings, Mail, Plus, Trash2, RefreshCw, CheckCircle2, XCircle, Clock,
   AlertCircle, Check, Globe, Send, Server, Users, Shield, Key, UserPlus,
-  ToggleLeft, ToggleRight, Search, Layers,
+  ToggleLeft, ToggleRight, Search, Layers, CalendarClock, Save,
 } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
@@ -33,8 +33,11 @@ import {
   useDeleteUser,
   useResetUserPassword,
   useGroupsList,
+  useCampaignSettingsFromSettings,
+  useUpdateCampaignSettings,
 } from '../hooks/use-settings'
 import type { CognitoUser } from '../types'
+import { TIMEZONE_OPTIONS } from '@/features/campaigns/types'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -53,7 +56,7 @@ const cognitoStatusLabel: Record<string, string> = {
 }
 
 type SesTab = 'identities' | 'senders' | 'infra'
-type MainTab = 'ses' | 'users'
+type MainTab = 'ses' | 'users' | 'scheduling'
 
 // ── Main Component ───────────────────────────────────────────────────────────
 
@@ -106,6 +109,18 @@ export function SettingsPage() {
           <Users className="w-4 h-4" />
           Usuários & Grupos
         </button>
+        <button
+          className={cn(
+            'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors',
+            mainTab === 'scheduling'
+              ? 'border-botica-600 text-botica-700'
+              : 'border-transparent text-slate-500 hover:text-slate-700',
+          )}
+          onClick={() => setMainTab('scheduling')}
+        >
+          <CalendarClock className="w-4 h-4" />
+          Agendamentos
+        </button>
       </div>
 
       {mainTab === 'ses' && (
@@ -140,6 +155,8 @@ export function SettingsPage() {
       )}
 
       {mainTab === 'users' && <UsersTab showToast={showToast} />}
+
+      {mainTab === 'scheduling' && <SchedulingTab showToast={showToast} />}
 
       {/* Toast */}
       {toast && (
@@ -719,6 +736,153 @@ function StatusCard({ label, value, color }: { label: string; value: string; col
     <div className="rounded-lg border border-slate-100 bg-slate-50 p-4">
       <p className="text-xs text-slate-500 mb-1">{label}</p>
       <p className={cn('text-lg font-semibold', color ?? 'text-slate-900')}>{value}</p>
+    </div>
+  )
+}
+
+// ── Scheduling Tab (EventBridge Scheduler) ───────────────────────────────────
+
+function SchedulingTab({ showToast }: { showToast: (m: string, t?: 'success' | 'error') => void }) {
+  const { data: settings, isLoading } = useCampaignSettingsFromSettings()
+  const updateSettings = useUpdateCampaignSettings()
+
+  const [timezone, setTimezone] = useState('')
+  const [scheduleGroup, setScheduleGroup] = useState('')
+  const [dirty, setDirty] = useState(false)
+
+  // Sync form with loaded settings
+  const syncForm = useCallback(() => {
+    if (settings) {
+      setTimezone(settings.timezone ?? 'America/Sao_Paulo')
+      setScheduleGroup(settings.scheduleGroupName ?? 'marketing-campaigns')
+      setDirty(false)
+    }
+  }, [settings])
+
+  // On first load
+  useState(() => { syncForm() })
+
+  // Sync when settings load
+  useCallback(() => { syncForm() }, [syncForm])
+
+  // Actually sync on data change
+  if (settings && !dirty && timezone === '' && scheduleGroup === '') {
+    setTimezone(settings.timezone ?? 'America/Sao_Paulo')
+    setScheduleGroup(settings.scheduleGroupName ?? 'marketing-campaigns')
+  }
+
+  const handleSave = useCallback(async () => {
+    try {
+      await updateSettings.mutateAsync({
+        timezone: timezone || 'America/Sao_Paulo',
+        scheduleGroupName: scheduleGroup || 'marketing-campaigns',
+      })
+      setDirty(false)
+      showToast('Configurações de agendamento salvas')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Erro ao salvar configurações', 'error')
+    }
+  }, [timezone, scheduleGroup, updateSettings, showToast])
+
+  const markDirty = useCallback(<T,>(setter: (v: T) => void) => (v: T) => {
+    setter(v)
+    setDirty(true)
+  }, [])
+
+  if (isLoading) {
+    return (
+      <div className="p-12 text-center text-sm text-slate-400">
+        <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2" />
+        Carregando configurações...
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* EventBridge Scheduler Settings */}
+      <div className="bg-white rounded-lg border border-slate-200 shadow-[var(--shadow-card)]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <CalendarClock className="w-5 h-5 text-botica-600" />
+            <div>
+              <h2 className="text-sm font-semibold text-slate-700">AWS EventBridge Scheduler</h2>
+              <p className="text-xs text-slate-500">Configurações de agendamento de campanhas</p>
+            </div>
+          </div>
+          <Button size="sm" onClick={handleSave} disabled={!dirty || updateSettings.isPending}>
+            <Save className="w-3.5 h-3.5 mr-1" />
+            {updateSettings.isPending ? 'Salvando...' : 'Salvar'}
+          </Button>
+        </div>
+        <div className="p-6 space-y-5">
+          {/* Timezone */}
+          <div>
+            <Label htmlFor="sched-timezone">Fuso Horário Padrão</Label>
+            <select
+              id="sched-timezone"
+              value={timezone}
+              onChange={(e) => markDirty(setTimezone)(e.target.value)}
+              className="mt-1 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+            >
+              {TIMEZONE_OPTIONS.map((tz) => (
+                <option key={tz.value} value={tz.value}>{tz.label} — {tz.value}</option>
+              ))}
+            </select>
+            <p className="text-xs text-slate-400 mt-1">
+              Fuso horário utilizado nos agendamentos do EventBridge Scheduler.
+            </p>
+          </div>
+
+          {/* Schedule Group */}
+          <div>
+            <Label htmlFor="sched-group">Schedule Group Name</Label>
+            <Input
+              id="sched-group"
+              value={scheduleGroup}
+              onChange={(e) => markDirty(setScheduleGroup)(e.target.value)}
+              placeholder="marketing-campaigns"
+              className="mt-1"
+            />
+            <p className="text-xs text-slate-400 mt-1">
+              Nome do grupo de schedules no EventBridge Scheduler. Deve ser criado previamente na AWS.
+            </p>
+          </div>
+
+
+        </div>
+      </div>
+
+      {/* Info Card */}
+      <div className="bg-blue-50 border border-blue-100 rounded-lg p-5">
+        <h3 className="text-sm font-semibold text-blue-800 mb-2 flex items-center gap-2">
+          <AlertCircle className="w-4 h-4" />
+          Como funciona
+        </h3>
+        <ul className="text-xs text-blue-700 space-y-1.5">
+          <li>• Campanhas agendadas criam um <strong>one-time schedule</strong> no AWS EventBridge Scheduler.</li>
+          <li>• O schedule invoca a Lambda <strong>campaign-scheduler</strong> na data/hora configurada.</li>
+          <li>• A Lambda busca os contatos, monta os e-mails e envia para a fila SQS <strong>emails-transactional</strong>.</li>
+          <li>• Você pode pausar, reagendar ou cancelar agendamentos a qualquer momento.</li>
+          <li>• &ldquo;Enviar Agora&rdquo; cria um agendamento para ~5 segundos no futuro.</li>
+        </ul>
+      </div>
+
+      {/* Architecture Info */}
+      <div className="bg-white rounded-lg border border-slate-200 shadow-[var(--shadow-card)] p-6">
+        <h3 className="text-sm font-semibold text-slate-700 mb-3">Arquitetura do Envio</h3>
+        <div className="flex items-center gap-2 text-xs text-slate-600 flex-wrap">
+          <span className="bg-slate-100 rounded px-2 py-1 font-mono">AppSync</span>
+          <span className="text-slate-400">→</span>
+          <span className="bg-blue-50 text-blue-700 rounded px-2 py-1 font-mono">EventBridge Scheduler</span>
+          <span className="text-slate-400">→</span>
+          <span className="bg-amber-50 text-amber-700 rounded px-2 py-1 font-mono">Lambda (marketing-worker)</span>
+          <span className="text-slate-400">→</span>
+          <span className="bg-green-50 text-green-700 rounded px-2 py-1 font-mono">SQS (emails-transactional)</span>
+          <span className="text-slate-400">→</span>
+          <span className="bg-red-50 text-red-700 rounded px-2 py-1 font-mono">Amazon SES</span>
+        </div>
+      </div>
     </div>
   )
 }

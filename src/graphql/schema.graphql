@@ -283,12 +283,20 @@ type Campaign {
 	subject: String!
 	templateName: String!
 	senderProfileId: String!
+	recipientType: String!
 	recipientFilter: String
+	segmentId: String
 	status: String!
 	scheduledAt: AWSDateTime
 	sentAt: AWSDateTime
+	completedAt: AWSDateTime
 	metrics: CampaignMetrics
 	configurationSet: String
+	scheduleArn: String
+	timezone: String
+	campaignTags: [String!]
+	utmParams: AWSJSON
+	estimatedRecipients: Int
 	createdAt: AWSDateTime!
 	updatedAt: AWSDateTime
 	createdBy: String
@@ -299,9 +307,13 @@ input CreateCampaignInput {
 	subject: String!
 	templateName: String!
 	senderProfileId: String!
+	recipientType: String
 	recipientFilter: String
+	segmentId: String
 	scheduledAt: AWSDateTime
 	configurationSet: String
+	campaignTags: [String!]
+	utmParams: AWSJSON
 }
 
 input UpdateCampaignInput {
@@ -309,9 +321,29 @@ input UpdateCampaignInput {
 	subject: String
 	templateName: String
 	senderProfileId: String
+	recipientType: String
 	recipientFilter: String
+	segmentId: String
 	scheduledAt: AWSDateTime
 	configurationSet: String
+	campaignTags: [String!]
+	utmParams: AWSJSON
+}
+
+# ── Campaign Settings (EventBridge Scheduler) ─────────────────────────────────
+
+type CampaignSettings {
+	timezone: String!
+	scheduleGroupName: String!
+	defaultUtmSource: String
+	defaultUtmMedium: String
+}
+
+input UpdateCampaignSettingsInput {
+	timezone: String
+	scheduleGroupName: String
+	defaultUtmSource: String
+	defaultUtmMedium: String
 }
 
 # ── Cognito ───────────────────────────────────────────────────────────────────
@@ -375,6 +407,7 @@ type Query {
 	# Campaigns
 	listCampaigns: [Campaign!]!
 	getCampaign(id: ID!): Campaign
+	getCampaignSettings: CampaignSettings
 	# Cognito
 	listUsers: [CognitoUser!]!
 	listGroups: [CognitoGroup!]!
@@ -408,9 +441,14 @@ type Mutation {
 	createCampaign(input: CreateCampaignInput!): Campaign!
 	updateCampaign(id: ID!, input: UpdateCampaignInput!): Campaign!
 	deleteCampaign(id: ID!): Boolean!
+	scheduleCampaign(id: ID!, scheduledAt: AWSDateTime!): Campaign!
+	rescheduleCampaign(id: ID!, scheduledAt: AWSDateTime!): Campaign!
 	sendCampaign(id: ID!): Campaign!
 	pauseCampaign(id: ID!): Campaign!
+	resumeCampaign(id: ID!): Campaign!
 	cancelCampaign(id: ID!): Campaign!
+	duplicateCampaign(id: ID!): Campaign!
+	updateCampaignSettings(input: UpdateCampaignSettingsInput!): CampaignSettings!
 	# Cognito
 	createUser(input: CreateUserInput!): CognitoUser!
 	updateUser(username: String!, input: UpdateUserInput!): CognitoUser!

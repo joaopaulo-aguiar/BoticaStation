@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import * as api from '../api/settings-api'
-import type { UpdateUserInput } from '../types'
+import type { UpdateUserInput, UpdateCampaignSettingsInput } from '../types'
 
 const KEYS = {
   identities: ['ses-identities'] as const,
@@ -10,6 +10,7 @@ const KEYS = {
   defaultConfigSet: ['default-config-set'] as const,
   users: ['cognito-users'] as const,
   groups: ['cognito-groups'] as const,
+  campaignSettings: ['campaign-settings'] as const,
 }
 
 // ── SES ──────────────────────────────────────────────────────────────────────
@@ -174,5 +175,24 @@ export function useGroupsList() {
     queryKey: KEYS.groups,
     queryFn: api.listGroups,
     staleTime: 60_000,
+  })
+}
+
+// ── Campaign Settings (EventBridge Scheduler) ────────────────────────────────
+
+export function useCampaignSettingsFromSettings() {
+  return useQuery({
+    queryKey: KEYS.campaignSettings,
+    queryFn: api.getCampaignSettings,
+    staleTime: 120_000,
+  })
+}
+
+export function useUpdateCampaignSettings() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (input: UpdateCampaignSettingsInput) =>
+      api.updateCampaignSettings(input),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: KEYS.campaignSettings }) },
   })
 }

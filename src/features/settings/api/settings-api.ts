@@ -2,6 +2,7 @@ import { generateClient } from 'aws-amplify/api'
 import type {
   VerifiedIdentity, SesAccountStatus, SenderProfile,
   CognitoUser, CognitoGroup, CreateUserInput, UpdateUserInput,
+  CampaignSettings, UpdateCampaignSettingsInput,
 } from '../types'
 
 const client = generateClient()
@@ -244,4 +245,36 @@ export async function listGroups(): Promise<CognitoGroup[]> {
   `
   const { data } = await client.graphql({ query }) as { data: { listGroups: CognitoGroup[] } }
   return data.listGroups ?? []
+}
+
+// ── Campaign Settings (EventBridge Scheduler) ────────────────────────────────
+
+export async function getCampaignSettings(): Promise<CampaignSettings> {
+  const query = /* GraphQL */ `
+    query GetCampaignSettings {
+      getCampaignSettings {
+        timezone
+        scheduleGroupName
+        defaultUtmSource
+        defaultUtmMedium
+      }
+    }
+  `
+  const { data } = await client.graphql({ query }) as { data: { getCampaignSettings: CampaignSettings } }
+  return data.getCampaignSettings
+}
+
+export async function updateCampaignSettings(input: UpdateCampaignSettingsInput): Promise<CampaignSettings> {
+  const mutation = /* GraphQL */ `
+    mutation UpdateCampaignSettings($input: UpdateCampaignSettingsInput!) {
+      updateCampaignSettings(input: $input) {
+        timezone
+        scheduleGroupName
+        defaultUtmSource
+        defaultUtmMedium
+      }
+    }
+  `
+  const { data } = await client.graphql({ query: mutation, variables: { input } }) as { data: { updateCampaignSettings: CampaignSettings } }
+  return data.updateCampaignSettings
 }

@@ -6,9 +6,10 @@ interface DialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   children: React.ReactNode
+  maxWidth?: string
 }
 
-function Dialog({ open, onOpenChange, children }: DialogProps) {
+function Dialog({ open, onOpenChange, children, maxWidth }: DialogProps) {
   React.useEffect(() => {
     if (open) document.body.style.overflow = 'hidden'
     else document.body.style.overflow = ''
@@ -18,7 +19,7 @@ function Dialog({ open, onOpenChange, children }: DialogProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => onOpenChange(false)} />
-      <div className="relative z-50 w-full max-w-lg">{children}</div>
+      <div className={cn('relative z-50 w-full', maxWidth ?? 'max-w-lg')}>{children}</div>
     </div>
   )
 }
