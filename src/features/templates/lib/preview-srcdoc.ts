@@ -1,6 +1,7 @@
 export type PreviewOptions = {
   inspectorEnabled?: boolean
   darkMode?: boolean
+  utmHighlight?: boolean
 }
 
 function getInspectorScript(): string {
@@ -100,9 +101,43 @@ function getDarkModeStyles(): string {
   `
 }
 
+function getUtmHighlightStyles(): string {
+  return `
+    a[href*="utm_"] {
+      text-decoration: underline !important;
+      text-decoration-color: #22c55e !important;
+      text-decoration-thickness: 2px !important;
+      text-underline-offset: 2px !important;
+      position: relative !important;
+    }
+    a[href*="utm_"]:hover::after {
+      content: attr(href);
+      position: absolute;
+      bottom: 100%;
+      left: 0;
+      background: rgba(0,0,0,0.9);
+      color: #22c55e;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font: 10px/1.3 Consolas, Monaco, monospace;
+      white-space: nowrap;
+      max-width: 500px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      z-index: 2147483647;
+      pointer-events: none;
+    }
+    a[data-no-utm] {
+      text-decoration-color: #ef4444 !important;
+      text-decoration-style: dashed !important;
+    }
+  `
+}
+
 export function buildPreviewSrcDoc(renderedBodyHtml: string, opts?: PreviewOptions): string {
   const inspectorEnabled = opts?.inspectorEnabled ?? true
   const darkMode = opts?.darkMode ?? false
+  const utmHighlight = opts?.utmHighlight ?? false
 
   const parts = [
     '<!doctype html><html><head>',
@@ -110,6 +145,7 @@ export function buildPreviewSrcDoc(renderedBodyHtml: string, opts?: PreviewOptio
     '<style>html,body{margin:0;padding:0;width:100%;height:100%}body{overflow-x:hidden;-webkit-text-size-adjust:100%}img{max-width:100%!important;height:auto!important}table{max-width:100%!important}td,th{word-wrap:break-word!important}</style>',
   ]
   if (darkMode) parts.push(`<style id="dark-mode-styles">${getDarkModeStyles()}</style>`)
+  if (utmHighlight) parts.push(`<style id="utm-highlight-styles">${getUtmHighlightStyles()}</style>`)
   parts.push('</head><body>')
   parts.push(renderedBodyHtml)
   if (inspectorEnabled) parts.push(`<script>${getInspectorScript()}<` + '/script>')

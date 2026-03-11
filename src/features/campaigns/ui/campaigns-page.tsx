@@ -35,7 +35,7 @@ import {
   useDeleteCampaignTag,
   useUpdateCampaignSettings,
 } from '../hooks/use-campaigns'
-import { useTemplatesList } from '@/features/templates/hooks/use-templates'
+import { useTemplatesList, useTemplateDetail } from '@/features/templates/hooks/use-templates'
 import { useSenderProfiles, useDefaultConfigurationSet } from '@/features/settings/hooks/use-settings'
 import { useSegmentsList } from '@/features/segmentation/hooks/use-segments'
 import { TemplatesPage } from '@/features/templates'
@@ -828,6 +828,7 @@ function CampaignFormDialog({ open, onClose, editCampaign, campaigns, showToast 
   const [confirmSendNow, setConfirmSendNow] = useState(false)
 
   const { data: templates = [] } = useTemplatesList()
+  const { data: templateDetail } = useTemplateDetail(form.templateName || null)
   const { data: senderProfiles = [] } = useSenderProfiles()
   const { data: segments = [] } = useSegmentsList()
   const { data: campaignSettings } = useCampaignSettings()
@@ -865,6 +866,27 @@ function CampaignFormDialog({ open, onClose, editCampaign, campaigns, showToast 
       updateField('subject', tmpl.displayName) // subject mirrors template
     }
   }
+
+  // When template detail loads, apply UTM defaults from template as fallback
+  const didApplyTemplateUtm = useRef<string | null>(null)
+  useEffect(() => {
+    if (!templateDetail?.utmDefaults || !form.templateName) return
+    if (didApplyTemplateUtm.current === form.templateName) return
+    if (editCampaign) return // Don't override on edit
+    didApplyTemplateUtm.current = form.templateName
+    const td = templateDetail.utmDefaults
+    const needsFill = !form.utm.utmSource && !form.utm.utmMedium
+    if (needsFill && (td.utmSource || td.utmMedium)) {
+      setForm((prev) => ({
+        ...prev,
+        utm: {
+          ...prev.utm,
+          utmSource: prev.utm.utmSource || td.utmSource || '',
+          utmMedium: prev.utm.utmMedium || td.utmMedium || 'email',
+        },
+      }))
+    }
+  }, [templateDetail, form.templateName, editCampaign]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const buildUtmJson = (): string | null => {
     const u = form.utm
@@ -1164,6 +1186,16 @@ function CampaignFormDialog({ open, onClose, editCampaign, campaigns, showToast 
               defaultSource={campaignSettings?.defaultUtmSource}
               defaultMedium={campaignSettings?.defaultUtmMedium}
             />
+            {templateDetail?.utmDefaults && (templateDetail.utmDefaults.utmSource || templateDetail.utmDefaults.utmMedium) && (
+              <div className="mt-1.5 flex items-center gap-2 text-[10px] text-slate-400">
+                <Link2 className="w-3 h-3" />
+                <span>
+                  Fallback do template: utm_source=<strong>{templateDetail.utmDefaults.utmSource || '—'}</strong>,
+                  utm_medium=<strong>{templateDetail.utmDefaults.utmMedium || '—'}</strong>
+                  {templateDetail.utmDefaults.utmCampaign && <>, utm_campaign=<strong>{templateDetail.utmDefaults.utmCampaign}</strong></>}
+                </span>
+              </div>
+            )}
         </div>
 
         {/* Footer */}

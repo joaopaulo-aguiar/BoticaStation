@@ -3,6 +3,7 @@ import {
   FileText, Plus, Search, Save, Send, Copy, Trash2, Eye, Code, EyeOff,
   MoreVertical, RefreshCw, AlertCircle, Check, History,
   Smartphone, Monitor, type LucideIcon, PanelLeftClose, PanelLeft,
+  Link2, ExternalLink, AlertTriangle, X as XIcon, ShieldOff,
 } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
@@ -23,8 +24,12 @@ import { renderHandlebars, safeParseJsonObject } from '../lib/handlebars-lite'
 import { htmlToPlainText, extractTemplateVariables } from '../lib/html-to-text'
 import { instrumentHtmlForMapping, type NodeLocationMap } from '../lib/instrument-html'
 import { buildPreviewSrcDoc } from '../lib/preview-srcdoc'
+import {
+  injectUtmIntoHtml, extractLinksFromHtml, getAutoUtmLinks,
+  toggleNoUtmAttribute, injectUtmIntoUrl, utmDefaultsToParams,
+} from '../lib/utm-utils'
 import { CodeEditor } from './code-editor'
-import type { TemplateSummary, BackupVersion } from '../types'
+import type { TemplateSummary, BackupVersion, TemplateUtmDefaults, TemplateLink } from '../types'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -343,6 +348,17 @@ export function TemplatesPage({ embedded }: { embedded?: boolean } = {}) {
   const [testSender, setTestSender] = useState('')
   const [versionHistoryDialog, setVersionHistoryDialog] = useState(false)
 
+  // ── UTM state ──
+  const [utmDefaults, setUtmDefaults] = useState<TemplateUtmDefaults>({})
+  const [showUtmPanel, setShowUtmPanel] = useState(false)
+  const [utmPreviewParams, setUtmPreviewParams] = useState<{ utm_source: string; utm_medium: string; utm_campaign: string }>({
+    utm_source: '', utm_medium: '', utm_campaign: '',
+  })
+  const [utmPreviewEnabled, setUtmPreviewEnabled] = useState(false)
+  const [linkEditorDialog, setLinkEditorDialog] = useState(false)
+  const [selectedLinkForEdit, setSelectedLinkForEdit] = useState<TemplateLink | null>(null)
+  const [utmValidationBanner, setUtmValidationBanner] = useState<TemplateLink[] | null>(null)
+
   const openTestEmailDialog = useCallback(() => {
     if (!testSender && senderProfiles.length > 0) setTestSender(senderProfiles[0].id)
     setTestEmailDialog(true)
@@ -371,6 +387,8 @@ export function TemplatesPage({ embedded }: { embedded?: boolean } = {}) {
       setSubject(detail.subject)
       setHtml(detail.html)
       setTestDataJson(detail.testData ? JSON.stringify(detail.testData, null, 2) : '{}')
+      setUtmDefaults(detail.utmDefaults ?? {})
+      setUtmValidationBanner(null)
       setIsDirty(false)
     }
   }, [detail])
@@ -388,20 +406,52 @@ export function TemplatesPage({ embedded }: { embedded?: boolean } = {}) {
   // ── Computed preview ──
   const testData = useMemo(() => safeParseJsonObject(testDataJson), [testDataJson])
   const renderedHtml = useMemo(() => renderHandlebars(html, testData), [html, testData])
+
+  // Apply UTM preview simulation if enabled
+  const renderedHtmlWithUtm = useMemo(() => {
+    if (!utmPreviewEnabled) return renderedHtml
+    const hasParams = utmPreviewParams.utm_source || utmPreviewParams.utm_medium || utmPreviewParams.utm_campaign
+    if (!hasParams) return renderedHtml
+    return injectUtmIntoHtml(renderedHtml, utmPreviewParams)
+  }, [renderedHtml, utmPreviewEnabled, utmPreviewParams])
+
   const { instrumentedHtml, nodeMap } = useMemo(() => {
-    if (!inspectorEnabled) return { instrumentedHtml: renderedHtml, nodeMap: {} }
-    const result = instrumentHtmlForMapping(renderedHtml)
+    if (!inspectorEnabled) return { instrumentedHtml: renderedHtmlWithUtm, nodeMap: {} }
+    const result = instrumentHtmlForMapping(renderedHtmlWithUtm)
     return { instrumentedHtml: result.html, nodeMap: result.map }
-  }, [renderedHtml, inspectorEnabled])
+  }, [renderedHtmlWithUtm, inspectorEnabled])
 
   useEffect(() => { nodeMapRef.current = nodeMap }, [nodeMap])
 
   const previewSrcDoc = useMemo(
-    () => buildPreviewSrcDoc(instrumentedHtml, { inspectorEnabled }),
-    [instrumentedHtml, inspectorEnabled],
+    () => buildPreviewSrcDoc(instrumentedHtml, { inspectorEnabled, utmHighlight: utmPreviewEnabled }),
+    [instrumentedHtml, inspectorEnabled, utmPreviewEnabled],
   )
 
   const templateVariables = useMemo(() => extractTemplateVariables(html, subject), [html, subject])
+
+  // ── Extracted links for UTM analysis ──
+  const extractedLinks = useMemo(() => extractLinksFromHtml(html), [html])
+
+  // ── UTM handlers ──
+  const handleUtmDefaultsChange = useCallback((field: keyof TemplateUtmDefaults, value: string) => {
+    setUtmDefaults((prev) => ({ ...prev, [field]: value }))
+    setIsDirty(true)
+  }, [])
+
+  const handleToggleLinkNoUtm = useCallback((link: TemplateLink, add: boolean) => {
+    const newHtml = toggleNoUtmAttribute(html, link.url, add)
+    setHtml(newHtml)
+    setIsDirty(true)
+  }, [html])
+
+  const handleGoToLinkInEditor = useCallback((link: TemplateLink) => {
+    if (link.line) {
+      setCursorLine(link.line)
+      setCursorCol(1)
+      setViewMode('split')
+    }
+  }, [])
 
   // ── Handlers ──
 
@@ -415,6 +465,14 @@ export function TemplatesPage({ embedded }: { embedded?: boolean } = {}) {
   const handleSave = useCallback(async () => {
     if (!selectedName) return
     try {
+      // Link validation: identify links that will receive automatic UTM
+      const autoLinks = getAutoUtmLinks(html)
+      if (autoLinks.length > 0) {
+        setUtmValidationBanner(autoLinks)
+      } else {
+        setUtmValidationBanner(null)
+      }
+
       const text = htmlToPlainText(html)
       await saveTemplate.mutateAsync({
         name: selectedName,
@@ -423,13 +481,14 @@ export function TemplatesPage({ embedded }: { embedded?: boolean } = {}) {
         html,
         text,
         testData: testDataJson !== '{}' ? testDataJson : undefined,
+        utmDefaults: utmDefaults,
       })
       setIsDirty(false)
       showToast('E-mail salvo com sucesso!')
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Erro ao salvar', 'error')
     }
-  }, [selectedName, displayName, subject, html, testDataJson, saveTemplate, showToast])
+  }, [selectedName, displayName, subject, html, testDataJson, utmDefaults, saveTemplate, showToast])
 
   const handleNewTemplate = useCallback(async () => {
     const friendly = newTemplateName.trim()
@@ -654,6 +713,15 @@ export function TemplatesPage({ embedded }: { embedded?: boolean } = {}) {
               >
                 {'{}'}
               </Button>
+              {/* UTM & Links */}
+              <Button
+                variant={showUtmPanel ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setShowUtmPanel(!showUtmPanel)}
+                title="UTM & Links"
+              >
+                <Link2 className="w-3.5 h-3.5" />
+              </Button>
               {/* History */}
               <Button
                 variant="outline"
@@ -763,6 +831,224 @@ export function TemplatesPage({ embedded }: { embedded?: boolean } = {}) {
                 </div>
               )}
             </div>
+
+            {/* UTM Validation Banner */}
+            {utmValidationBanner && utmValidationBanner.length > 0 && (
+              <div className="border-t border-amber-200 bg-amber-50 px-3 py-2">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                    <span className="text-xs font-medium text-amber-800">
+                      {utmValidationBanner.length} link{utmValidationBanner.length !== 1 ? 's' : ''} neste template receberão UTMs automaticamente na hora do envio
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setUtmValidationBanner(null)}
+                    className="text-amber-500 hover:text-amber-700 cursor-pointer"
+                  >
+                    <XIcon className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
+                  {utmValidationBanner.map((link, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleGoToLinkInEditor(link)}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] hover:bg-amber-200 transition-colors cursor-pointer truncate max-w-xs"
+                      title={`Ir para a linha ${link.line ?? '?'}`}
+                    >
+                      <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                      {link.text || link.url}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-amber-600 mt-1">
+                  Revise se necessário. Links com <code className="bg-amber-100 px-0.5 rounded">data-no-utm</code> serão ignorados.
+                </p>
+              </div>
+            )}
+
+            {/* UTM & Links Panel */}
+            {showUtmPanel && (
+              <div className="border-t border-slate-200 bg-white max-h-72 overflow-y-auto">
+                <div className="px-4 py-3 space-y-4">
+                  {/* UTM Global Defaults */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Link2 className="w-3.5 h-3.5 text-botica-600" />
+                      <span className="text-xs font-semibold text-slate-700">UTM Padrão do Template</span>
+                      <span className="text-[10px] text-slate-400">(fallback quando a campanha não define UTMs)</span>
+                    </div>
+                    <div className="flex gap-2 items-end">
+                      <div className="w-36">
+                        <label className="text-[10px] text-slate-500 block">utm_source</label>
+                        <input
+                          value={utmDefaults.utmSource ?? ''}
+                          onChange={(e) => handleUtmDefaultsChange('utmSource', e.target.value)}
+                          placeholder="newsletter"
+                          className="w-full h-7 text-xs rounded-md border border-slate-200 px-2 focus:outline-none focus:ring-1 focus:ring-botica-500"
+                        />
+                      </div>
+                      <div className="w-36">
+                        <label className="text-[10px] text-slate-500 block">utm_medium</label>
+                        <input
+                          value={utmDefaults.utmMedium ?? ''}
+                          onChange={(e) => handleUtmDefaultsChange('utmMedium', e.target.value)}
+                          placeholder="email"
+                          className="w-full h-7 text-xs rounded-md border border-slate-200 px-2 focus:outline-none focus:ring-1 focus:ring-botica-500"
+                        />
+                      </div>
+                      <div className="w-44">
+                        <label className="text-[10px] text-slate-500 block">utm_campaign</label>
+                        <input
+                          value={utmDefaults.utmCampaign ?? ''}
+                          onChange={(e) => handleUtmDefaultsChange('utmCampaign', e.target.value)}
+                          placeholder="promo-verao"
+                          className="w-full h-7 text-xs rounded-md border border-slate-200 px-2 focus:outline-none focus:ring-1 focus:ring-botica-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* UTM Preview Simulation */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Eye className="w-3.5 h-3.5 text-botica-600" />
+                      <span className="text-xs font-semibold text-slate-700">Simular UTMs no Preview</span>
+                      <button
+                        onClick={() => {
+                          setUtmPreviewEnabled(!utmPreviewEnabled)
+                          if (!utmPreviewEnabled && utmDefaults.utmSource) {
+                            setUtmPreviewParams({
+                              utm_source: utmDefaults.utmSource || '',
+                              utm_medium: utmDefaults.utmMedium || 'email',
+                              utm_campaign: utmDefaults.utmCampaign || '',
+                            })
+                          }
+                        }}
+                        className={cn(
+                          'ml-auto text-[10px] px-2 py-0.5 rounded-full font-medium transition-colors cursor-pointer',
+                          utmPreviewEnabled
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200',
+                        )}
+                      >
+                        {utmPreviewEnabled ? 'Ativo' : 'Inativo'}
+                      </button>
+                    </div>
+                    {utmPreviewEnabled && (
+                      <div className="flex gap-2 items-end">
+                        <div className="w-36">
+                          <label className="text-[10px] text-slate-500 block">utm_source</label>
+                          <input
+                            value={utmPreviewParams.utm_source}
+                            onChange={(e) => setUtmPreviewParams((p) => ({ ...p, utm_source: e.target.value }))}
+                            placeholder="newsletter"
+                            className="w-full h-7 text-xs rounded-md border border-slate-200 px-2 focus:outline-none focus:ring-1 focus:ring-botica-500"
+                          />
+                        </div>
+                        <div className="w-36">
+                          <label className="text-[10px] text-slate-500 block">utm_medium</label>
+                          <input
+                            value={utmPreviewParams.utm_medium}
+                            onChange={(e) => setUtmPreviewParams((p) => ({ ...p, utm_medium: e.target.value }))}
+                            placeholder="email"
+                            className="w-full h-7 text-xs rounded-md border border-slate-200 px-2 focus:outline-none focus:ring-1 focus:ring-botica-500"
+                          />
+                        </div>
+                        <div className="w-44">
+                          <label className="text-[10px] text-slate-500 block">utm_campaign</label>
+                          <input
+                            value={utmPreviewParams.utm_campaign}
+                            onChange={(e) => setUtmPreviewParams((p) => ({ ...p, utm_campaign: e.target.value }))}
+                            placeholder="promo-verao"
+                            className="w-full h-7 text-xs rounded-md border border-slate-200 px-2 focus:outline-none focus:ring-1 focus:ring-botica-500"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Links Analysis Table */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <ExternalLink className="w-3.5 h-3.5 text-botica-600" />
+                      <span className="text-xs font-semibold text-slate-700">Links no Template</span>
+                      <Badge className="text-[10px] bg-slate-100 text-slate-600">{extractedLinks.length}</Badge>
+                    </div>
+                    {extractedLinks.length === 0 ? (
+                      <p className="text-xs text-slate-400 italic">Nenhum link encontrado no HTML</p>
+                    ) : (
+                      <div className="border border-slate-200 rounded-md overflow-hidden max-h-40 overflow-y-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="bg-slate-50 text-slate-500">
+                              <th className="text-left px-2 py-1 font-medium">Link</th>
+                              <th className="text-left px-2 py-1 font-medium w-20">UTM</th>
+                              <th className="text-left px-2 py-1 font-medium w-24">Exclusão</th>
+                              <th className="w-16 px-2 py-1" />
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {extractedLinks.map((link, idx) => (
+                              <tr key={idx} className="hover:bg-slate-50">
+                                <td className="px-2 py-1.5">
+                                  <button
+                                    onClick={() => handleGoToLinkInEditor(link)}
+                                    className="text-left cursor-pointer hover:text-botica-600 transition-colors"
+                                    title={link.url}
+                                  >
+                                    <div className="font-medium text-slate-700 truncate max-w-xs">{link.text}</div>
+                                    <div className="text-[10px] text-slate-400 truncate max-w-xs">{link.url}</div>
+                                  </button>
+                                </td>
+                                <td className="px-2 py-1.5">
+                                  {!link.isTrackable ? (
+                                    <span className="text-slate-400 text-[10px]">N/A</span>
+                                  ) : link.hasHardcodedUtm ? (
+                                    <Badge className="text-[9px] bg-green-100 text-green-700">Manual</Badge>
+                                  ) : link.excludeFromUtm ? (
+                                    <Badge className="text-[9px] bg-red-100 text-red-600">Excluído</Badge>
+                                  ) : (
+                                    <Badge className="text-[9px] bg-blue-100 text-blue-700">Auto</Badge>
+                                  )}
+                                </td>
+                                <td className="px-2 py-1.5">
+                                  {link.isTrackable && !link.hasHardcodedUtm && (
+                                    <button
+                                      onClick={() => handleToggleLinkNoUtm(link, !link.excludeFromUtm)}
+                                      className={cn(
+                                        'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer',
+                                        link.excludeFromUtm
+                                          ? 'bg-red-50 text-red-600 hover:bg-red-100'
+                                          : 'bg-slate-50 text-slate-500 hover:bg-slate-100',
+                                      )}
+                                      title={link.excludeFromUtm ? 'Reativar injeção de UTM' : 'Excluir da injeção automática de UTM'}
+                                    >
+                                      <ShieldOff className="w-3 h-3" />
+                                      {link.excludeFromUtm ? 'Excluído' : 'Excluir'}
+                                    </button>
+                                  )}
+                                </td>
+                                <td className="px-2 py-1.5 text-right">
+                                  <button
+                                    onClick={() => { setSelectedLinkForEdit(link); setLinkEditorDialog(true) }}
+                                    className="text-slate-400 hover:text-botica-600 cursor-pointer"
+                                    title="Editar UTM deste link"
+                                  >
+                                    <MoreVertical className="w-3.5 h-3.5" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Status bar */}
             <div className="flex items-center justify-between px-3 py-1 border-t border-slate-200 bg-white text-[10px] text-slate-400">
@@ -1039,6 +1325,86 @@ export function TemplatesPage({ embedded }: { embedded?: boolean } = {}) {
           }
         }}
       />
+
+      {/* Link UTM Editor Dialog */}
+      <Dialog open={linkEditorDialog} onOpenChange={setLinkEditorDialog}>
+        <DialogContent onClose={() => setLinkEditorDialog(false)}>
+          <DialogHeader>
+            <DialogTitle>Configurar Link</DialogTitle>
+            <DialogDescription>Configure os parâmetros UTM para este link específico</DialogDescription>
+          </DialogHeader>
+          {selectedLinkForEdit && (
+            <div className="space-y-4">
+              <div>
+                <Label className="text-xs font-medium text-slate-600">URL Atual</Label>
+                <div className="mt-1 flex items-center h-9 rounded-md border border-slate-200 bg-slate-50 px-3 text-xs text-slate-600 truncate">
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 mr-2 shrink-0" />
+                  {selectedLinkForEdit.url}
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs font-medium text-slate-600">Texto do Link</Label>
+                <div className="mt-1 h-9 flex items-center rounded-md border border-slate-200 bg-slate-50 px-3 text-xs text-slate-500">
+                  {selectedLinkForEdit.text}
+                </div>
+              </div>
+              <div className="pt-2 border-t border-slate-100">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold text-slate-700">Status UTM</span>
+                  {selectedLinkForEdit.isTrackable ? (
+                    selectedLinkForEdit.hasHardcodedUtm ? (
+                      <Badge className="text-[10px] bg-green-100 text-green-700">UTM Manual (hardcoded)</Badge>
+                    ) : selectedLinkForEdit.excludeFromUtm ? (
+                      <Badge className="text-[10px] bg-red-100 text-red-600">Excluído da injeção</Badge>
+                    ) : (
+                      <Badge className="text-[10px] bg-blue-100 text-blue-700">Receberá UTM automático</Badge>
+                    )
+                  ) : (
+                    <Badge className="text-[10px] bg-slate-100 text-slate-500">Não rastreável</Badge>
+                  )}
+                </div>
+                {selectedLinkForEdit.isTrackable && !selectedLinkForEdit.hasHardcodedUtm && (
+                  <Button
+                    variant={selectedLinkForEdit.excludeFromUtm ? 'default' : 'outline'}
+                    size="sm"
+                    className="w-full"
+                    onClick={() => {
+                      handleToggleLinkNoUtm(selectedLinkForEdit, !selectedLinkForEdit.excludeFromUtm)
+                      setLinkEditorDialog(false)
+                    }}
+                  >
+                    <ShieldOff className="w-3.5 h-3.5 mr-1" />
+                    {selectedLinkForEdit.excludeFromUtm
+                      ? 'Reativar injeção automática de UTM'
+                      : 'Excluir da injeção automática de UTM'}
+                  </Button>
+                )}
+                {selectedLinkForEdit.isTrackable && selectedLinkForEdit.hasHardcodedUtm && (
+                  <p className="text-xs text-slate-400">
+                    Este link já possui parâmetros UTM no HTML — eles serão preservados.
+                  </p>
+                )}
+              </div>
+              {selectedLinkForEdit.isTrackable && utmPreviewEnabled && !selectedLinkForEdit.excludeFromUtm && !selectedLinkForEdit.hasHardcodedUtm && (
+                <div className="pt-2 border-t border-slate-100">
+                  <Label className="text-xs font-medium text-slate-600">Preview da URL com UTMs</Label>
+                  <div className="mt-1 p-2 rounded-md bg-slate-50 border border-slate-200 text-[11px] text-green-700 font-mono break-all">
+                    {injectUtmIntoUrl(selectedLinkForEdit.url, utmPreviewParams)}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLinkEditorDialog(false)}>Fechar</Button>
+            {selectedLinkForEdit?.line && (
+              <Button onClick={() => { handleGoToLinkInEditor(selectedLinkForEdit); setLinkEditorDialog(false) }}>
+                Ir para o código
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Toast Notification */}
       {toast && (

@@ -1,5 +1,5 @@
 import { generateClient } from 'aws-amplify/api'
-import type { TemplateSummary, TemplateDetail, BackupVersion } from '../types'
+import type { TemplateSummary, TemplateDetail, TemplateUtmDefaults, BackupVersion } from '../types'
 
 const client = generateClient()
 
@@ -49,6 +49,11 @@ export async function getTemplate(name: string): Promise<TemplateDetail> {
   if (detail.testData && typeof detail.testData === 'string') {
     try { detail.testData = JSON.parse(detail.testData) } catch { /* keep as is */ }
   }
+  // Extract UTM defaults stored inside testData
+  if (detail.testData && typeof detail.testData === 'object' && '__utmDefaults__' in detail.testData) {
+    detail.utmDefaults = detail.testData.__utmDefaults__ as TemplateUtmDefaults
+    delete detail.testData.__utmDefaults__
+  }
   return detail
 }
 
@@ -93,6 +98,7 @@ export interface SaveTemplateInput {
   html: string
   text: string
   testData?: string
+  utmDefaults?: TemplateUtmDefaults
 }
 
 export async function saveTemplate(input: SaveTemplateInput): Promise<{ name: string; updatedAt: string }> {
@@ -104,7 +110,25 @@ export async function saveTemplate(input: SaveTemplateInput): Promise<{ name: st
       }
     }
   `
-  const { data } = await client.graphql({ query: mutation, variables: { input } }) as { data: { saveTemplate: { name: string; updatedAt: string } } }
+  // Merge utmDefaults into testData for persistence
+  let testDataStr = input.testData
+  if (input.utmDefaults) {
+    const hasValues = input.utmDefaults.utmSource || input.utmDefaults.utmMedium || input.utmDefaults.utmCampaign
+    if (hasValues) {
+      const parsed = testDataStr ? JSON.parse(testDataStr) : {}
+      parsed.__utmDefaults__ = input.utmDefaults
+      testDataStr = JSON.stringify(parsed)
+    }
+  }
+  const gqlInput = {
+    name: input.name,
+    displayName: input.displayName,
+    subject: input.subject,
+    html: input.html,
+    text: input.text,
+    testData: testDataStr,
+  }
+  const { data } = await client.graphql({ query: mutation, variables: { input: gqlInput } }) as { data: { saveTemplate: { name: string; updatedAt: string } } }
   return data.saveTemplate
 }
 

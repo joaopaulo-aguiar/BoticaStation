@@ -341,6 +341,7 @@ function buildEmailMessage(campaign, senderProfile, contact) {
     type: 'CAMPAIGN_EMAIL',
     campaignId: campaign.id,
     campaignName: campaign.name,
+    campaignTags: campaign.campaignTags ?? [],
     // Recipient
     toAddress: contact.email,
     contactId: contact.id,
