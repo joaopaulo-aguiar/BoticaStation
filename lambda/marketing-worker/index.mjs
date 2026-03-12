@@ -341,7 +341,6 @@ function buildEmailMessage(campaign, senderProfile, contact) {
     type: 'CAMPAIGN_EMAIL',
     campaignId: campaign.id,
     campaignName: campaign.name,
-    campaignTags: campaign.campaignTags ?? [],
     // Recipient
     toAddress: contact.email,
     contactId: contact.id,
@@ -367,9 +366,9 @@ function buildEmailMessage(campaign, senderProfile, contact) {
     }),
     // SES configuration
     configurationSet: campaign.configurationSet || undefined,
-    // SES message tags for tracking
+    // SES message tags for tracking (campanha in base64, campaignId plain)
     tags: {
-      campanha: sanitizeSesTagValue(campaign.name),
+      campanha: Buffer.from(sanitizeSesTagValue(campaign.name)).toString('base64'),
       campaignId: campaign.id,
       tipo: 'campaign',
     },
@@ -378,14 +377,14 @@ function buildEmailMessage(campaign, senderProfile, contact) {
 
 /**
  * Sanitize a string for use as SES tag value.
- * SES tag values only accept ASCII alphanumeric + _ - . @
+ * SES tag values accept printable ASCII characters (0x20-0x7E).
+ * Preserves spaces, pipes, hyphens and other printable chars.
  */
 function sanitizeSesTagValue(value) {
   if (!value) return '';
   return value
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove accents
-    .replace(/\s+/g, '_')                              // spaces → _
-    .replace(/[^a-zA-Z0-9_\-.@]/g, '')                // remove invalid chars
+    .replace(/[^\x20-\x7E]/g, '')                     // keep only printable ASCII
     .slice(0, 256);                                     // SES limit
 }
 

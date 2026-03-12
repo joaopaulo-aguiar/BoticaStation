@@ -69,6 +69,15 @@ type CashbackInfo {
 	expiryDate: String
 }
 
+type EcommerceInfo {
+	paidOrders: Int!
+	revenue: Float!
+	avgTicket: Float!
+	lastPurchaseAt: AWSDateTime
+	abandonedCarts: Int!
+	abandonedCartValue: Float!
+}
+
 type ContactStats {
 	emailSends: Int!
 	emailDeliveries: Int!
@@ -89,6 +98,8 @@ type Contact {
 	# Classificação
 	lifecycleStage: String!
 	cashbackInfo: CashbackInfo
+	ecommerceInfo: EcommerceInfo
+	legalBasis: String
 	tags: [String!]!
 	# Metadados
 	createdAt: AWSDateTime!
@@ -110,6 +121,18 @@ type ContactListResult {
 	items: [Contact!]!
 	nextToken: String
 	totalCount: Int
+}
+
+type LifecycleCounts {
+	lead: Int!
+	subscriber: Int!
+	customer: Int!
+}
+
+type ContactCounters {
+	total: Int!
+	byLifecycle: LifecycleCounts!
+	updatedAt: AWSDateTime
 }
 
 type ImportResult {
@@ -294,7 +317,6 @@ type Campaign {
 	configurationSet: String
 	scheduleArn: String
 	timezone: String
-	campaignTags: [String!]
 	utmParams: AWSJSON
 	estimatedRecipients: Int
 	createdAt: AWSDateTime!
@@ -312,21 +334,19 @@ input CreateCampaignInput {
 	segmentId: String
 	scheduledAt: AWSDateTime
 	configurationSet: String
-	campaignTags: [String!]
 	utmParams: AWSJSON
 }
 
 input UpdateCampaignInput {
 	name: String
 	subject: String
-	templateName: String
+	templateNameName: String
 	senderProfileId: String
 	recipientType: String
 	recipientFilter: String
 	segmentId: String
 	scheduledAt: AWSDateTime
 	configurationSet: String
-	campaignTags: [String!]
 	utmParams: AWSJSON
 }
 
@@ -392,6 +412,7 @@ type Query {
 	getContact(id: ID!): Contact
 	findContactByEmail(email: String!): Contact
 	findContactByPhone(phone: String!): Contact
+	getContactCounters: ContactCounters!
 	# Contact Events
 	listContactEvents(contactId: ID!, limit: Int, nextToken: String, filter: ContactEventFilterInput): ContactEventListResult!
 	# Segments

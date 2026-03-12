@@ -4,6 +4,7 @@ import {
   Send, CheckCircle, Eye, MousePointerClick, AlertTriangle,
   AlertOctagon, XCircle, ChevronDown, RefreshCw, Clock,
   ExternalLink, MessageSquare, Gift, Globe, FileText,
+  ShoppingCart, CheckSquare,
 } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Badge } from '@/shared/ui/badge'
@@ -16,7 +17,7 @@ import {
   getEventConfig,
   SOURCE_LABELS,
 } from '../types'
-import type { Contact, ContactEvent, ContactStats, ContactEventFilterInput } from '../types'
+import type { Contact, ContactEvent, ContactStats, ContactEventFilterInput, EcommerceInfo } from '../types'
 
 // ── Event Icons (channel-aware) ─────────────────────────────────────────────────────
 
@@ -278,6 +279,28 @@ export function ContactDetailDialog({ contact, open, onClose }: ContactDetailDia
                 )}
               </section>
 
+              {/* Data Protection */}
+              <section className="rounded-lg border border-slate-200 bg-white p-3">
+                <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5" /> Proteção de dados
+                </h3>
+                <div className="space-y-1.5">
+                  <div className="flex items-start gap-2">
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider">Base legal para comunicação</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {contact.legalBasis ? (
+                      <><CheckSquare className="w-3.5 h-3.5 text-green-600" /><span className="text-xs font-medium text-green-700">Aceitou</span></>
+                    ) : (
+                      <span className="text-xs text-slate-400 italic">Não informado</span>
+                    )}
+                  </div>
+                </div>
+              </section>
+
+              {/* Ecommerce Activity */}
+              <EcommerceSection ecommerce={contact.ecommerceInfo} />
+
               {/* Channel Health */}
               <section className="rounded-lg border border-slate-200 bg-white p-3">
                 <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Saúde dos Canais</h3>
@@ -400,6 +423,38 @@ export function ContactDetailDialog({ contact, open, onClose }: ContactDetailDia
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Ecommerce Section ────────────────────────────────────────────────────────
+
+function EcommerceSection({ ecommerce }: { ecommerce: EcommerceInfo | null | undefined }) {
+  const e = ecommerce ?? { paidOrders: 0, revenue: 0, avgTicket: 0, lastPurchaseAt: null, abandonedCarts: 0, abandonedCartValue: 0 }
+  const fmt = (v: number) => `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-3">
+      <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+        <ShoppingCart className="w-3.5 h-3.5" /> Atividade no ecommerce
+      </h3>
+      <div className="space-y-2">
+        <EcommerceRow label="Pedidos pagos" value={String(e.paidOrders)} />
+        <EcommerceRow label="Receita" value={fmt(e.revenue)} />
+        <EcommerceRow label="Ticket médio" value={fmt(e.avgTicket)} />
+        <EcommerceRow label="Data da última compra" value={e.lastPurchaseAt ? formatDate(e.lastPurchaseAt) : '—'} />
+        <EcommerceRow label="Carrinhos abandonados" value={String(e.abandonedCarts)} />
+        <EcommerceRow label="Valor total abandonado" value={fmt(e.abandonedCartValue)} />
+      </div>
+    </section>
+  )
+}
+
+function EcommerceRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between border-b border-slate-100 pb-1.5 last:border-0 last:pb-0">
+      <span className="text-[11px] text-slate-500">{label}</span>
+      <span className="text-xs font-semibold text-slate-700">{value}</span>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import { generateClient } from 'aws-amplify/api'
-import type { Campaign, CreateCampaignInput, UpdateCampaignInput, CampaignSettings, UpdateCampaignSettingsInput, CampaignTag, CreateTagInput, UpdateTagInput } from '../types'
+import type { Campaign, CreateCampaignInput, UpdateCampaignInput, CampaignSettings, UpdateCampaignSettingsInput } from '../types'
 
 const client = generateClient()
 
@@ -28,7 +28,6 @@ const CAMPAIGN_FIELDS = /* GraphQL */ `
   configurationSet
   scheduleArn
   timezone
-  campaignTags
   utmParams
   estimatedRecipients
   createdAt
@@ -212,60 +211,4 @@ export async function updateCampaignSettings(input: UpdateCampaignSettingsInput)
   `
   const { data } = await client.graphql({ query: mutation, variables: { input } }) as { data: { updateCampaignSettings: CampaignSettings } }
   return data.updateCampaignSettings
-}
-
-// ── Campaign Tags ────────────────────────────────────────────────────────────
-
-const TAG_FIELDS = /* GraphQL */ `
-  id
-  name
-  color
-  createdAt
-  updatedAt
-`
-
-export async function listCampaignTags(): Promise<CampaignTag[]> {
-  const query = /* GraphQL */ `
-    query ListCampaignTags {
-      listCampaignTags {
-        ${TAG_FIELDS}
-      }
-    }
-  `
-  const { data } = await client.graphql({ query }) as { data: { listCampaignTags: CampaignTag[] } }
-  return data.listCampaignTags ?? []
-}
-
-export async function createCampaignTag(input: CreateTagInput): Promise<CampaignTag> {
-  const mutation = /* GraphQL */ `
-    mutation CreateCampaignTag($input: CreateCampaignTagInput!) {
-      createCampaignTag(input: $input) {
-        ${TAG_FIELDS}
-      }
-    }
-  `
-  const { data } = await client.graphql({ query: mutation, variables: { input } }) as { data: { createCampaignTag: CampaignTag } }
-  return data.createCampaignTag
-}
-
-export async function updateCampaignTag(id: string, input: UpdateTagInput): Promise<CampaignTag> {
-  const mutation = /* GraphQL */ `
-    mutation UpdateCampaignTag($id: ID!, $input: UpdateCampaignTagInput!) {
-      updateCampaignTag(id: $id, input: $input) {
-        ${TAG_FIELDS}
-      }
-    }
-  `
-  const { data } = await client.graphql({ query: mutation, variables: { id, input } }) as { data: { updateCampaignTag: CampaignTag } }
-  return data.updateCampaignTag
-}
-
-export async function deleteCampaignTag(id: string): Promise<boolean> {
-  const mutation = /* GraphQL */ `
-    mutation DeleteCampaignTag($id: ID!) {
-      deleteCampaignTag(id: $id)
-    }
-  `
-  const { data } = await client.graphql({ query: mutation, variables: { id } }) as { data: { deleteCampaignTag: boolean } }
-  return data.deleteCampaignTag
 }

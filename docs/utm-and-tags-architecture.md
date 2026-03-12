@@ -37,7 +37,7 @@ Configurações Globais  →  Template UTM Defaults  →  UTM da Campanha
 ### 3. Construção das mensagens (marketing-worker Lambda)
 - A função `buildEmailMessage()` lê `campaign.utmParams` e inclui os valores no `templateData`
 - Envia na mensagem SQS:
-  - `campaignId`, `campaignName`, `campaignTags` — para rastreamento
+  - `campaignId`, `campaignName` — para rastreamento
   - `tags` — objeto com tags de rastreamento SES (campanha, campaignId, tipo)
   - `templateData` — dados de merge incluindo UTM params
 
@@ -51,11 +51,14 @@ Configurações Globais  →  Template UTM Defaults  →  UTM da Campanha
 O campo `tags` na mensagem SQS contém:
 ```json
 {
-  "campanha": "Promo_Final_de_Semana_25_02_26",
+  "campanha": "VGVzdGUgZGUgRW52aW8=",
   "campaignId": "b4f2b628-da3e-4e2c-8b3a-34ba1293f8f3",
   "tipo": "campaign"
 }
 ```
+
+A tag `campanha` é o nome da campanha sanitizado (acentos removidos) e codificado em **base64**.
+O `campaignId` é enviado em texto plano para facilitar a leitura no backend.
 
 Essas tags são enviadas junto com o e-mail e aparecem em:
 - CloudWatch Events
@@ -66,10 +69,11 @@ Essas tags são enviadas junto com o e-mail e aparecem em:
 
 ## ⚠️ ATUALIZAÇÃO NECESSÁRIA NO FARGATE WORKER (SQS Consumer)
 
-O Fargate worker que consome a fila SQS (`emails-transactional`) precisa ser atualizado para
-incluir `EmailTags` ao enviar e-mails via SES v2.
+O Fargate worker que consome a fila SQS (`emails-transactional`) **DEVE** incluir
+`EmailTags` ao enviar e-mails via SES v2. Sem isso, os eventos SES (opens, clicks,
+bounces) não terão as tags `campanha` e `campaignId`, impedindo a contabilização.
 
-### Código atual (SEM tags):
+### Código atual (SEM tags — BROKEN):
 ```javascript
 const params = {
     FromEmailAddress: fromAddress,
@@ -84,7 +88,7 @@ const params = {
 };
 ```
 
-### Código atualizado (COM tags):
+### Código atualizado (COM tags — REQUIRED):
 ```javascript
 // Construir EmailTags a partir do payload SQS
 const emailTags = [];
@@ -94,10 +98,7 @@ if (body.campaignId) {
 if (body.campaignName) {
     emailTags.push({ Name: "campaignName", Value: body.campaignName });
 }
-if (body.campaignTags && Array.isArray(body.campaignTags)) {
-    emailTags.push({ Name: "campaignTags", Value: body.campaignTags.join(",") });
-}
-// Tags customizadas do payload
+// Tags customizadas do payload (campanha em base64, tipo, etc.)
 if (body.tags && typeof body.tags === "object") {
     for (const [key, val] of Object.entries(body.tags)) {
         if (val && !emailTags.find(t => t.Name === key)) {
@@ -119,6 +120,12 @@ const params = {
     EmailTags: emailTags.length > 0 ? emailTags : undefined,
 };
 ```
+
+### Formato das tags no SQS payload
+- `body.tags.campanha` → nome da campanha em **base64** (decodificar com `atob()` ou `Buffer.from(val, 'base64').toString()`)
+- `body.tags.campaignId` → UUID da campanha em texto plano
+- `body.tags.tipo` → tipo do envio (`"campaign"`)
+- `body.campaignId` e `body.campaignName` → campos extras de conveniência
 
 ### Por que as tags não apareciam?
 A Lambda `marketing-worker` já envia `tags` e `campaignName` na mensagem SQS,

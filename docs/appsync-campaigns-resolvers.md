@@ -38,7 +38,6 @@
 | configurationSet | String | Nome do Configuration Set SES (nullable) |
 | scheduleArn | String | ARN do schedule no EventBridge (nullable) |
 | timezone | String | Fuso horário do agendamento (nullable) |
-| campaignTags | List | Lista de tags/labels da campanha (nullable) |
 | utmParams | String | AWSJSON com parâmetros UTM (nullable) |
 | estimatedRecipients | Number | Contagem estimada de destinatários (nullable) |
 | createdAt | String | ISO 8601 |
@@ -153,7 +152,6 @@ export function request(ctx) {
     configurationSet: input.configurationSet ?? null,
     scheduleArn: null,
     timezone: null,
-    campaignTags: input.campaignTags ?? null,
     utmParams: input.utmParams ?? null,
     estimatedRecipients: null,
     createdAt: now,
@@ -245,11 +243,6 @@ export function request(ctx) {
     expParts.push('#segmentId = :segmentId');
     expNames['#segmentId'] = 'segmentId';
     Object.assign(expValues, util.dynamodb.toMapValues({ ':segmentId': input.segmentId }));
-  }
-  if (input.campaignTags !== undefined) {
-    expParts.push('#campaignTags = :campaignTags');
-    expNames['#campaignTags'] = 'campaignTags';
-    Object.assign(expValues, util.dynamodb.toMapValues({ ':campaignTags': input.campaignTags }));
   }
   if (input.utmParams !== undefined) {
     expParts.push('#utmParams = :utmParams');

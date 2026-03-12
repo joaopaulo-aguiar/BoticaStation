@@ -3,12 +3,11 @@ import { createPortal } from 'react-dom'
 import {
   Megaphone, Plus, Search, Trash2, Pencil, Copy, Send, RefreshCw,
   AlertCircle, Check, Calendar, Pause, Play, X as XIcon,
-  MoreVertical, Tag, ChevronLeft, ChevronRight, Mail,
-  Link2, Save, Settings2, Clock, Zap, AlertTriangle,
+  MoreVertical, ChevronLeft, ChevronRight, Mail,
+  Link2, Save, Clock, Zap, AlertTriangle, Users,
 } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
-import { Badge } from '@/shared/ui/badge'
 import { Label } from '@/shared/ui/label'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
@@ -29,23 +28,17 @@ import {
   useResumeCampaign,
   useDuplicateCampaign,
   useCampaignSettings,
-  useCampaignTags,
-  useCreateCampaignTag,
-  useUpdateCampaignTag,
-  useDeleteCampaignTag,
   useUpdateCampaignSettings,
 } from '../hooks/use-campaigns'
 import { useTemplatesList, useTemplateDetail } from '@/features/templates/hooks/use-templates'
 import { useSenderProfiles, useDefaultConfigurationSet } from '@/features/settings/hooks/use-settings'
 import { useSegmentsList } from '@/features/segmentation/hooks/use-segments'
+import { useContactCounters } from '@/features/contacts/hooks/use-contacts'
 import { TemplatesPage } from '@/features/templates'
 import {
   CAMPAIGN_STATUSES,
   RECIPIENT_TYPE_OPTIONS,
   LIFECYCLE_FILTER_OPTIONS,
-  TIMEZONE_OPTIONS,
-  TAG_COLOR_OPTIONS,
-  getTagColorClasses,
 } from '../types'
 import type {
   Campaign,
@@ -53,29 +46,16 @@ import type {
   RecipientType,
   CreateCampaignInput,
   UtmParams,
-  CampaignTag,
 } from '../types'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatDateBR(iso: string | null): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('pt-BR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  })
-}
-
-function formatRelativeDate(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'agora'
-  if (mins < 60) return `${mins}min atrás`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h atrás`
-  const days = Math.floor(hours / 24)
-  if (days < 7) return `${days}d atrás`
-  return new Date(dateStr).toLocaleDateString('pt-BR')
+function FormatDateBold({ iso }: { iso: string | null }) {
+  if (!iso) return <span>—</span>
+  const d = new Date(iso)
+  const date = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const time = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  return <span>{date} - <strong>{time}</strong></span>
 }
 
 function getStatusConfig(status: CampaignStatus) {
@@ -257,22 +237,28 @@ function CampaignCalendar({ selectedDate, onSelectDate, selectedTime, onSelectTi
         const key = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`
         const dayCampaigns = campaignsByDate[key] ?? []
         if (!dayCampaigns.length) return null
+        const visible = dayCampaigns.slice(0, 3)
+        const remaining = dayCampaigns.length - visible.length
         return (
           <div className="pt-2 border-t border-slate-100">
-            <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Campanhas neste dia</span>
-            <div className="mt-1 space-y-1">
-              {dayCampaigns.map((c) => {
+            <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">
+              {dayCampaigns.length} campanha{dayCampaigns.length > 1 ? 's' : ''} neste dia
+            </span>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {visible.map((c) => {
                 const st = getStatusConfig(c.status)
                 return (
-                  <div key={c.id} className="flex items-center gap-2 text-xs bg-slate-50 rounded px-2 py-1">
-                    <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', st.color.split(' ')[0])} />
-                    <span className="truncate flex-1 text-slate-700">{c.name}</span>
-                    <span className="text-slate-400 shrink-0">
-                      {c.scheduledAt ? new Date(c.scheduledAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—'}
-                    </span>
-                  </div>
+                  <span key={c.id} className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium', st.color)}>
+                    {c.scheduledAt ? new Date(c.scheduledAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + ' ' : ''}
+                    {c.name.length > 20 ? c.name.slice(0, 20) + '…' : c.name}
+                  </span>
                 )
               })}
+              {remaining > 0 && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-500">
+                  +{remaining}
+                </span>
+              )}
             </div>
           </div>
         )
@@ -313,8 +299,6 @@ function UtmSection({ utm, onChange, campaignName, defaultSource, defaultMedium 
     }
   }, [defaultSource, defaultMedium]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const effectiveSource = utm.utmSource || defaultSource || 'botica'
-  const effectiveMedium = utm.utmMedium || defaultMedium || 'email'
   const effectiveCampaign = autoUtmCampaign || 'nome-da-campanha'
 
   return (
@@ -359,290 +343,6 @@ function UtmSection({ utm, onChange, campaignName, defaultSource, defaultMedium 
           />
         </div>
       </div>
-    </div>
-  )
-}
-
-// ── Tag Selector (multi-select pill buttons) ─────────────────────────────────
-
-interface TagSelectorProps {
-  tags: CampaignTag[]
-  selected: string[]
-  onChange: (selected: string[]) => void
-}
-
-function TagSelector({ tags, selected, onChange }: TagSelectorProps) {
-  const toggle = (tagName: string) => {
-    if (selected.includes(tagName)) {
-      onChange(selected.filter((t) => t !== tagName))
-    } else {
-      onChange([...selected, tagName])
-    }
-  }
-
-  if (!tags.length) {
-    return (
-      <p className="text-[10px] text-slate-400 italic">
-        Nenhuma tag criada. Vá em &ldquo;Tags&rdquo; para criar.
-      </p>
-    )
-  }
-
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {tags.map((tag) => {
-        const colors = getTagColorClasses(tag.color)
-        const isActive = selected.includes(tag.name)
-        return (
-          <button
-            key={tag.id}
-            type="button"
-            onClick={() => toggle(tag.name)}
-            className={cn(
-              'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium transition-all cursor-pointer border',
-              isActive
-                ? `${colors.bg} ${colors.text} border-current shadow-sm ring-1 ${colors.ring}`
-                : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300',
-            )}
-          >
-            <span className={cn('w-2 h-2 rounded-full', isActive ? 'bg-current' : colors.bg)} />
-            {tag.name}
-            {isActive && <Check className="w-3 h-3" />}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
-// ── Tag Management Tab ───────────────────────────────────────────────────────
-
-function TagsManagement({ showToast }: { showToast: (msg: string, type?: 'success' | 'error') => void }) {
-  const { data: tags = [], isLoading, refetch } = useCampaignTags()
-  const createTag = useCreateCampaignTag()
-  const updateTag = useUpdateCampaignTag()
-  const deleteTag = useDeleteCampaignTag()
-
-  const [createDialog, setCreateDialog] = useState(false)
-  const [editTag, setEditTag] = useState<CampaignTag | null>(null)
-  const [deleteDialog, setDeleteDialog] = useState<CampaignTag | null>(null)
-  const [newName, setNewName] = useState('')
-  const [newColor, setNewColor] = useState('blue')
-
-  const handleCreate = useCallback(async () => {
-    const name = newName.trim()
-    if (!name) return
-    try {
-      await createTag.mutateAsync({ name, color: newColor })
-      setNewName('')
-      setNewColor('blue')
-      setCreateDialog(false)
-      showToast('Tag criada com sucesso')
-    } catch {
-      showToast('Erro ao criar tag', 'error')
-    }
-  }, [newName, newColor, createTag, showToast])
-
-  const handleUpdate = useCallback(async () => {
-    if (!editTag) return
-    const name = newName.trim()
-    if (!name) return
-    try {
-      await updateTag.mutateAsync({ id: editTag.id, input: { name, color: newColor } })
-      setEditTag(null)
-      setNewName('')
-      setNewColor('blue')
-      showToast('Tag atualizada')
-    } catch {
-      showToast('Erro ao atualizar tag', 'error')
-    }
-  }, [editTag, newName, newColor, updateTag, showToast])
-
-  const handleDelete = useCallback(async () => {
-    if (!deleteDialog) return
-    try {
-      await deleteTag.mutateAsync(deleteDialog.id)
-      setDeleteDialog(null)
-      showToast('Tag removida')
-    } catch {
-      showToast('Erro ao remover tag', 'error')
-    }
-  }, [deleteDialog, deleteTag, showToast])
-
-  const openEdit = (tag: CampaignTag) => {
-    setEditTag(tag)
-    setNewName(tag.name)
-    setNewColor(tag.color)
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Tag className="w-4 h-4 text-slate-500" />
-          <span className="text-sm font-semibold text-slate-700">Gerenciar Tags</span>
-          <Badge className="text-[10px]">{tags.length}</Badge>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={isLoading}>
-            <RefreshCw className={cn('w-3.5 h-3.5', isLoading && 'animate-spin')} />
-          </Button>
-          <Button size="sm" onClick={() => { setNewName(''); setNewColor('blue'); setCreateDialog(true) }}>
-            <Plus className="w-3.5 h-3.5" /> Nova Tag
-          </Button>
-        </div>
-      </div>
-
-      {isLoading ? (
-        <div className="text-center py-8 text-sm text-slate-400">Carregando tags...</div>
-      ) : tags.length === 0 ? (
-        <div className="text-center py-12">
-          <Tag className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-          <p className="text-sm text-slate-500">Nenhuma tag criada</p>
-          <p className="text-xs text-slate-400 mt-1">Tags ajudam a organizar e filtrar suas campanhas</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-          {tags.map((tag) => {
-            const colors = getTagColorClasses(tag.color)
-            return (
-              <div
-                key={tag.id}
-                className={cn('flex items-center gap-2 px-3 py-2.5 rounded-lg border border-slate-100', colors.bg)}
-              >
-                <span className={cn('w-3 h-3 rounded-full shrink-0', `bg-current ${colors.text}`)} />
-                <span className={cn('text-sm font-medium flex-1 truncate', colors.text)}>{tag.name}</span>
-                <button
-                  onClick={() => openEdit(tag)}
-                  className="p-0.5 rounded hover:bg-white/60 text-slate-400 hover:text-slate-600 cursor-pointer"
-                >
-                  <Pencil className="w-3 h-3" />
-                </button>
-                <button
-                  onClick={() => setDeleteDialog(tag)}
-                  className="p-0.5 rounded hover:bg-white/60 text-slate-400 hover:text-red-500 cursor-pointer"
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Create Tag Dialog */}
-      <Dialog open={createDialog} onOpenChange={setCreateDialog}>
-        <DialogContent onClose={() => setCreateDialog(false)}>
-          <DialogHeader>
-            <DialogTitle>Nova Tag</DialogTitle>
-            <DialogDescription>Crie uma tag para categorizar suas campanhas</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label>Nome da Tag</Label>
-              <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Ex: Promoção" className="mt-1" />
-            </div>
-            <div>
-              <Label>Cor</Label>
-              <div className="flex flex-wrap gap-2 mt-1.5">
-                {TAG_COLOR_OPTIONS.map((c) => (
-                  <button
-                    key={c.value}
-                    type="button"
-                    onClick={() => setNewColor(c.value)}
-                    className={cn(
-                      'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer',
-                      c.bg, c.text,
-                      newColor === c.value ? `ring-2 ${c.ring} border-current` : 'border-transparent',
-                    )}
-                  >
-                    {c.label}
-                    {newColor === c.value && <Check className="w-3 h-3" />}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {newName.trim() && (
-              <div className="pt-2 border-t border-slate-100">
-                <span className="text-[10px] text-slate-400 mb-1 block">Preview</span>
-                <span className={cn('inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium', getTagColorClasses(newColor).bg, getTagColorClasses(newColor).text)}>
-                  <span className="w-2 h-2 rounded-full bg-current" />
-                  {newName.trim()}
-                </span>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateDialog(false)}>Cancelar</Button>
-            <Button onClick={handleCreate} disabled={!newName.trim() || createTag.isPending}>
-              {createTag.isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-              Criar Tag
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Tag Dialog */}
-      <Dialog open={!!editTag} onOpenChange={() => setEditTag(null)}>
-        <DialogContent onClose={() => setEditTag(null)}>
-          <DialogHeader>
-            <DialogTitle>Editar Tag</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label>Nome da Tag</Label>
-              <Input value={newName} onChange={(e) => setNewName(e.target.value)} className="mt-1" />
-            </div>
-            <div>
-              <Label>Cor</Label>
-              <div className="flex flex-wrap gap-2 mt-1.5">
-                {TAG_COLOR_OPTIONS.map((c) => (
-                  <button
-                    key={c.value}
-                    type="button"
-                    onClick={() => setNewColor(c.value)}
-                    className={cn(
-                      'flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-all cursor-pointer',
-                      c.bg, c.text,
-                      newColor === c.value ? `ring-2 ${c.ring} border-current` : 'border-transparent',
-                    )}
-                  >
-                    {c.label}
-                    {newColor === c.value && <Check className="w-3 h-3" />}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditTag(null)}>Cancelar</Button>
-            <Button onClick={handleUpdate} disabled={!newName.trim() || updateTag.isPending}>
-              {updateTag.isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-              Salvar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation */}
-      <Dialog open={!!deleteDialog} onOpenChange={() => setDeleteDialog(null)}>
-        <DialogContent onClose={() => setDeleteDialog(null)}>
-          <DialogHeader>
-            <DialogTitle>Remover Tag</DialogTitle>
-            <DialogDescription>
-              Tem certeza que deseja remover a tag <strong>{deleteDialog?.name}</strong>?
-              Campanhas existentes manterão a tag, mas ela não aparecerá mais na seleção.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialog(null)}>Cancelar</Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={deleteTag.isPending}>
-              {deleteTag.isPending ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-              Remover
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
@@ -748,6 +448,46 @@ function UtmDefaultsTab({ showToast }: { showToast: (msg: string, type?: 'succes
   )
 }
 
+// ── Estimated Recipients Indicator ────────────────────────────────────────────
+
+interface EstimatedRecipientsProps {
+  recipientType: RecipientType
+  recipientFilter: string
+  segmentId: string
+  contactCounters: { total: number; byLifecycle: { lead: number; subscriber: number; customer: number } } | undefined
+  segments: { id: string; name: string; contactCount: number | null }[]
+}
+
+function EstimatedRecipients({ recipientType, recipientFilter, segmentId, contactCounters, segments }: EstimatedRecipientsProps) {
+  let count: number | null = null
+  let label = ''
+
+  if (recipientType === 'all') {
+    count = contactCounters?.total ?? null
+    label = 'todos os contatos ativos'
+  } else if (recipientType === 'lifecycleStage' && recipientFilter) {
+    count = contactCounters?.byLifecycle?.[recipientFilter as 'lead' | 'subscriber' | 'customer'] ?? null
+    label = `contatos ${recipientFilter}`
+  } else if (recipientType === 'segment' && segmentId) {
+    const seg = segments.find((s) => s.id === segmentId)
+    count = seg?.contactCount ?? null
+    label = seg ? `segmento "${seg.name}"` : 'segmento'
+  }
+
+  if (count === null && !contactCounters) return null
+
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 mt-1">
+      <Users className="w-4 h-4 text-blue-600 shrink-0" />
+      <div className="text-xs text-blue-800">
+        <span className="font-bold text-base text-blue-700">{count != null ? count.toLocaleString('pt-BR') : '—'}</span>{' '}
+        <span>contatos estimados</span>
+        {label && <span className="text-blue-500"> · {label}</span>}
+      </div>
+    </div>
+  )
+}
+
 // ── Campaign Create/Edit Dialog ──────────────────────────────────────────────
 
 interface CampaignFormState {
@@ -761,7 +501,6 @@ interface CampaignFormState {
   sendMode: 'schedule' | 'now'
   scheduledDate: Date | null
   scheduledTime: string
-  campaignTags: string[]
   utm: UtmParams
 }
 
@@ -777,7 +516,6 @@ function getInitialFormState(): CampaignFormState {
     sendMode: 'schedule',
     scheduledDate: null,
     scheduledTime: '09:00',
-    campaignTags: [],
     utm: {},
   }
 }
@@ -797,7 +535,6 @@ function campaignToFormState(c: Campaign): CampaignFormState {
     scheduledTime: c.scheduledAt
       ? `${String(new Date(c.scheduledAt).getHours()).padStart(2, '0')}:${String(new Date(c.scheduledAt).getMinutes()).padStart(2, '0')}`
       : '09:00',
-    campaignTags: c.campaignTags ?? [],
     utm: parsed,
   }
 }
@@ -826,13 +563,14 @@ interface CampaignFormDialogProps {
 function CampaignFormDialog({ open, onClose, editCampaign, campaigns, showToast }: CampaignFormDialogProps) {
   const [form, setForm] = useState<CampaignFormState>(getInitialFormState)
   const [confirmSendNow, setConfirmSendNow] = useState(false)
+  const [savingState, setSavingState] = useState<'idle' | 'saving' | 'done'>('idle')
 
   const { data: templates = [] } = useTemplatesList()
   const { data: templateDetail } = useTemplateDetail(form.templateName || null)
   const { data: senderProfiles = [] } = useSenderProfiles()
   const { data: segments = [] } = useSegmentsList()
+  const { data: contactCounters } = useContactCounters()
   const { data: campaignSettings } = useCampaignSettings()
-  const { data: tags = [] } = useCampaignTags()
   const { data: defaultConfigSet } = useDefaultConfigurationSet()
 
   const createCampaign = useCreateCampaign()
@@ -849,6 +587,7 @@ function CampaignFormDialog({ open, onClose, editCampaign, campaigns, showToast 
         setForm(getInitialFormState())
       }
       setConfirmSendNow(false)
+      setSavingState('idle')
     }
     prevOpen.current = open
   }, [open, editCampaign])
@@ -903,6 +642,7 @@ function CampaignFormDialog({ open, onClose, editCampaign, campaigns, showToast 
 
   const doSave = useCallback(async () => {
     try {
+      setSavingState('saving')
       const utmJson = buildUtmJson()
       const base = {
         name: form.name.trim(),
@@ -912,14 +652,14 @@ function CampaignFormDialog({ open, onClose, editCampaign, campaigns, showToast 
         recipientType: form.recipientType,
         recipientFilter: form.recipientType === 'lifecycleStage' ? form.recipientFilter || null : null,
         segmentId: form.recipientType === 'segment' ? form.segmentId || null : null,
-        campaignTags: form.campaignTags.length ? form.campaignTags : null,
         utmParams: utmJson,
         configurationSet: defaultConfigSet || null,
       }
 
+      let toastMsg: string
       if (editCampaign) {
         await updateCampaign.mutateAsync({ id: editCampaign.id, input: base })
-        showToast('Campanha atualizada')
+        toastMsg = 'Campanha atualizada'
       } else {
         const created = await createCampaign.mutateAsync(base as CreateCampaignInput)
         if (form.sendMode === 'schedule' && form.scheduledDate) {
@@ -927,13 +667,19 @@ function CampaignFormDialog({ open, onClose, editCampaign, campaigns, showToast 
           const [h, m] = form.scheduledTime.split(':').map(Number)
           d.setHours(h, m, 0, 0)
           await scheduleCampaign.mutateAsync({ id: created.id, scheduledAt: d.toISOString() })
-          showToast('Campanha criada e agendada')
+          toastMsg = 'Campanha criada e agendada'
         } else {
-          showToast('Campanha criada como rascunho')
+          toastMsg = 'Campanha criada como rascunho'
         }
       }
-      onClose()
+      setSavingState('done')
+      setTimeout(() => {
+        onClose()
+        showToast(toastMsg)
+        setSavingState('idle')
+      }, 800)
     } catch {
+      setSavingState('idle')
       showToast('Erro ao salvar campanha', 'error')
     }
   }, [form, editCampaign, createCampaign, updateCampaign, scheduleCampaign, onClose, showToast, buildUtmJson, campaignSettings])
@@ -953,11 +699,33 @@ function CampaignFormDialog({ open, onClose, editCampaign, campaigns, showToast 
     : null
   const isValid = form.templateName && form.name.trim() && form.senderProfileId
     && (form.sendMode === 'now' || !scheduleError)
-  const isSaving = createCampaign.isPending || updateCampaign.isPending
+  const isSaving = savingState !== 'idle'
 
   return (
-    <Dialog open={open} onOpenChange={onClose} maxWidth="max-w-5xl">
-      <DialogContent onClose={onClose} className="!p-0 !max-h-[90vh]">
+    <Dialog open={open} onOpenChange={isSaving ? () => {} : onClose} maxWidth="max-w-5xl">
+      <DialogContent onClose={isSaving ? undefined : onClose} className="!p-0 !max-h-[90vh] relative">
+        {/* Loading / success overlay */}
+        {isSaving && (
+          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm rounded-lg">
+            {savingState === 'saving' ? (
+              <>
+                <div className="w-10 h-10 border-4 border-botica-200 border-t-botica-600 rounded-full animate-spin" />
+                <p className="mt-3 text-sm font-medium text-slate-600">
+                  {editCampaign ? 'Salvando campanha...' : 'Criando campanha...'}
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                  <Check className="w-6 h-6 text-green-600" />
+                </div>
+                <p className="mt-3 text-sm font-medium text-green-700">
+                  {editCampaign ? 'Campanha salva!' : 'Campanha criada!'}
+                </p>
+              </>
+            )}
+          </div>
+        )}
         {/* Header */}
         <div className="px-6 pt-5 pb-3 border-b border-slate-100">
           <DialogHeader className="!mb-0">
@@ -1091,19 +859,21 @@ function CampaignFormDialog({ open, onClose, editCampaign, campaigns, showToast 
                 >
                   <option value="">Selecione um segmento...</option>
                   {segments.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
+                    <option key={s.id} value={s.id}>{s.name}{s.contactCount != null ? ` (${s.contactCount.toLocaleString('pt-BR')} contatos)` : ''}</option>
                   ))}
                 </select>
               </div>
             )}
 
-            {/* Tags */}
-            <div>
-              <Label className="text-xs font-medium text-slate-600">Tags</Label>
-              <div className="mt-1.5">
-                <TagSelector tags={tags} selected={form.campaignTags} onChange={(v) => updateField('campaignTags', v)} />
-              </div>
-            </div>
+            {/* Estimated Recipients */}
+            <EstimatedRecipients
+              recipientType={form.recipientType}
+              recipientFilter={form.recipientFilter}
+              segmentId={form.segmentId}
+              contactCounters={contactCounters}
+              segments={segments}
+            />
+
           </div>
 
           {/* RIGHT: Schedule + UTM */}
@@ -1324,7 +1094,7 @@ function ActionMenu({ campaign, onEdit, onDuplicate, onDelete, onSend, onPause, 
 
 function CampaignListView({ showToast }: { showToast: (msg: string, type?: 'success' | 'error') => void }) {
   const { data: campaigns = [], isLoading, refetch } = useCampaignsList()
-  const { data: tags = [] } = useCampaignTags()
+  const { data: segments = [] } = useSegmentsList()
   const deleteCampaign = useDeleteCampaign()
   const sendCampaign = useSendCampaign()
   const pauseCampaign = usePauseCampaign()
@@ -1334,19 +1104,27 @@ function CampaignListView({ showToast }: { showToast: (msg: string, type?: 'succ
 
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [tagFilter, setTagFilter] = useState<string>('all')
   const [formDialog, setFormDialog] = useState(false)
   const [editCampaign, setEditCampaign] = useState<Campaign | null>(null)
   const [deleteDialog, setDeleteDialog] = useState<Campaign | null>(null)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
+  const getRecipientLabel = useCallback((c: Campaign) => {
+    if (c.recipientType === 'segment' && c.segmentId) {
+      const seg = segments.find((s) => s.id === c.segmentId)
+      return seg ? seg.name : 'Segmento'
+    }
+    if (c.recipientType === 'lifecycleStage' && c.recipientFilter) {
+      const opt = LIFECYCLE_FILTER_OPTIONS.find((o) => o.value === c.recipientFilter)
+      return opt ? opt.label : c.recipientFilter
+    }
+    return 'Todos os Contatos'
+  }, [segments])
+
   const filteredCampaigns = useMemo(() => {
     let result = campaigns
     if (statusFilter !== 'all') {
       result = result.filter((c) => c.status === statusFilter)
-    }
-    if (tagFilter !== 'all') {
-      result = result.filter((c) => c.campaignTags?.includes(tagFilter))
     }
     if (search.trim()) {
       const q = search.toLowerCase()
@@ -1357,7 +1135,7 @@ function CampaignListView({ showToast }: { showToast: (msg: string, type?: 'succ
       )
     }
     return result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-  }, [campaigns, statusFilter, tagFilter, search])
+  }, [campaigns, statusFilter, search])
 
   const handleEdit = (c: Campaign) => {
     setEditCampaign(c)
@@ -1401,18 +1179,6 @@ function CampaignListView({ showToast }: { showToast: (msg: string, type?: 'succ
               <option key={s.value} value={s.value}>{s.label}</option>
             ))}
           </select>
-          {tags.length > 0 && (
-            <select
-              value={tagFilter}
-              onChange={(e) => setTagFilter(e.target.value)}
-              className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-botica-500"
-            >
-              <option value="all">Todas Tags</option>
-              {tags.map((t) => (
-                <option key={t.id} value={t.name}>{t.name}</option>
-              ))}
-            </select>
-          )}
         </div>
         <div className="flex gap-2">
           <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={isLoading}>
@@ -1444,10 +1210,11 @@ function CampaignListView({ showToast }: { showToast: (msg: string, type?: 'succ
               <TableHead className="w-32">Criada em</TableHead>
               <TableHead className="max-w-[200px]">Campanha</TableHead>
               <TableHead className="w-36">Agendamento</TableHead>
-              <TableHead className="w-20 text-right">Envios</TableHead>
+              <TableHead className="w-20 text-right">Destinatários</TableHead>
+              <TableHead className="w-20 text-right">Entregues</TableHead>
               <TableHead className="w-20 text-right">Abertura</TableHead>
-              <TableHead className="w-16 text-right">Cliques</TableHead>
-              <TableHead className="w-16 text-right">Bounce</TableHead>
+              <TableHead className="w-20 text-right">Cliques</TableHead>
+              <TableHead className="w-20 text-right">Bounce</TableHead>
               <TableHead className="w-20 text-right">Descadastro</TableHead>
               <TableHead className="w-10" />
             </TableRow>
@@ -1463,7 +1230,7 @@ function CampaignListView({ showToast }: { showToast: (msg: string, type?: 'succ
               return (
                 <TableRow key={c.id} className={cn(actionLoading === c.id && 'opacity-50 pointer-events-none')}>
                   <TableCell>
-                    <span className="text-[11px] text-slate-500 whitespace-nowrap">{formatDateBR(c.createdAt)}</span>
+                    <span className="text-[11px] text-slate-500 whitespace-nowrap"><FormatDateBold iso={c.createdAt} /></span>
                   </TableCell>
                   <TableCell className="max-w-[200px]">
                     <div className="flex items-start gap-2">
@@ -1474,20 +1241,6 @@ function CampaignListView({ showToast }: { showToast: (msg: string, type?: 'succ
                             {st.label}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          {c.campaignTags?.slice(0, 3).map((tagName) => {
-                            const tagDef = tags.find((t) => t.name === tagName)
-                            const colors = tagDef ? getTagColorClasses(tagDef.color) : { bg: 'bg-slate-100', text: 'text-slate-600' }
-                            return (
-                              <span key={tagName} className={cn('inline-flex px-1.5 py-px rounded-full text-[8px] font-medium', colors.bg, colors.text)}>
-                                {tagName}
-                              </span>
-                            )
-                          })}
-                          {(c.campaignTags?.length ?? 0) > 3 && (
-                            <span className="text-[8px] text-slate-400">+{(c.campaignTags?.length ?? 0) - 3}</span>
-                          )}
-                        </div>
                       </div>
                     </div>
                   </TableCell>
@@ -1496,14 +1249,14 @@ function CampaignListView({ showToast }: { showToast: (msg: string, type?: 'succ
                       <div className="text-xs text-slate-600">
                         <div className="flex items-center gap-1">
                           <Calendar className="w-3 h-3 text-slate-400" />
-                          {formatDateBR(c.scheduledAt)}
+                          <FormatDateBold iso={c.scheduledAt} />
                         </div>
                       </div>
                     ) : c.sentAt ? (
                       <div className="text-xs text-green-600">
                         <div className="flex items-center gap-1">
                           <Check className="w-3 h-3" />
-                          {formatDateBR(c.sentAt)}
+                          <FormatDateBold iso={c.sentAt} />
                         </div>
                       </div>
                     ) : (
@@ -1511,16 +1264,19 @@ function CampaignListView({ showToast }: { showToast: (msg: string, type?: 'succ
                     )}
                   </TableCell>
                   <TableCell className="text-right">
+                    <div>
+                      <span className="text-lg font-bold text-slate-800">{m ? m.sent.toLocaleString('pt-BR') : '—'}</span>
+                      <span className="block text-[10px] text-slate-400 mt-0.5 truncate max-w-[120px] ml-auto">{getRecipientLabel(c)}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-right">
                     {m ? (
-                      <div>
-                        <span className="text-sm font-semibold text-slate-800">{m.sent.toLocaleString('pt-BR')}</span>
-                        <span className={cn(
-                          'block text-[10px] mt-0.5',
-                          m.delivered === m.sent ? 'text-green-600' : 'text-amber-600',
-                        )}>
-                          {m.delivered === m.sent ? 'entregues' : `${m.delivered.toLocaleString('pt-BR')} entregues`}
-                        </span>
-                      </div>
+                      <span className={cn(
+                        'text-lg font-bold',
+                        m.delivered === m.sent ? 'text-green-600' : 'text-amber-600',
+                      )}>
+                        {m.delivered.toLocaleString('pt-BR')}
+                      </span>
                     ) : (
                       <span className="text-xs text-slate-300">—</span>
                     )}
@@ -1529,12 +1285,12 @@ function CampaignListView({ showToast }: { showToast: (msg: string, type?: 'succ
                     {openRate !== null ? (
                       <div>
                         <span className={cn(
-                          'text-sm font-bold',
+                          'text-sm font-semibold',
                           openRate >= 30 ? 'text-green-600' : openRate >= 15 ? 'text-blue-600' : 'text-amber-600',
                         )}>
                           {openRate.toFixed(2).replace('.', ',')}%
                         </span>
-                        <span className="block text-[10px] text-slate-400 mt-0.5">{m!.opened.toLocaleString('pt-BR')}</span>
+                        <span className="block text-xs font-medium text-slate-500 mt-0.5">{m!.opened.toLocaleString('pt-BR')}</span>
                       </div>
                     ) : (
                       <span className="text-xs text-slate-300">—</span>
@@ -1544,12 +1300,12 @@ function CampaignListView({ showToast }: { showToast: (msg: string, type?: 'succ
                     {clickRate !== null ? (
                       <div>
                         <span className={cn(
-                          'text-sm font-bold',
+                          'text-sm font-semibold',
                           clickRate >= 5 ? 'text-green-600' : clickRate >= 2 ? 'text-blue-600' : 'text-slate-600',
                         )}>
                           {clickRate.toFixed(2).replace('.', ',')}%
                         </span>
-                        <span className="block text-[10px] text-slate-400 mt-0.5">{m!.clicked.toLocaleString('pt-BR')}</span>
+                        <span className="block text-xs font-medium text-slate-500 mt-0.5">{m!.clicked.toLocaleString('pt-BR')}</span>
                       </div>
                     ) : (
                       <span className="text-xs text-slate-300">—</span>
@@ -1559,11 +1315,12 @@ function CampaignListView({ showToast }: { showToast: (msg: string, type?: 'succ
                     {bounceRate !== null ? (
                       <div>
                         <span className={cn(
-                          'text-sm font-bold',
+                          'text-sm font-semibold',
                           bounceRate > 5 ? 'text-red-600' : bounceRate > 2 ? 'text-amber-600' : 'text-slate-600',
                         )}>
                           {bounceRate.toFixed(2).replace('.', ',')}%
                         </span>
+                        <span className="block text-xs font-medium text-slate-500 mt-0.5">{m!.bounced.toLocaleString('pt-BR')}</span>
                       </div>
                     ) : (
                       <span className="text-xs text-slate-300">—</span>
@@ -1573,11 +1330,12 @@ function CampaignListView({ showToast }: { showToast: (msg: string, type?: 'succ
                     {unsubRate !== null ? (
                       <div>
                         <span className={cn(
-                          'text-sm font-bold',
+                          'text-sm font-semibold',
                           unsubRate > 1 ? 'text-red-600' : unsubRate > 0.3 ? 'text-amber-600' : 'text-slate-600',
                         )}>
                           {unsubRate.toFixed(2).replace('.', ',')}%
                         </span>
+                        <span className="block text-xs font-medium text-slate-500 mt-0.5">{m!.unsubscribed.toLocaleString('pt-BR')}</span>
                       </div>
                     ) : (
                       <span className="text-xs text-slate-300">—</span>
@@ -1670,7 +1428,7 @@ function CampaignListView({ showToast }: { showToast: (msg: string, type?: 'succ
 
 // ── Main Page (Default: Campaign List + Tabs: E-mails | Tags | UTM) ─────────
 
-type CampaignsTab = 'list' | 'emails' | 'tags' | 'utm'
+type CampaignsTab = 'list' | 'emails' | 'utm'
 
 export function CampaignsPage() {
   const [tab, setTab] = useState<CampaignsTab>('list')
@@ -1683,16 +1441,15 @@ export function CampaignsPage() {
 
   const tabs: { key: CampaignsTab; label: string; icon: typeof Mail }[] = [
     { key: 'emails', label: 'E-mails', icon: Mail },
-    { key: 'tags', label: 'Tags', icon: Tag },
     { key: 'utm', label: 'UTM', icon: Link2 },
   ]
 
   return (
-    <div className={cn('flex flex-col', tab === 'emails' ? 'h-[calc(100vh-4rem-2.25rem)] -m-4 lg:-m-6' : 'space-y-4')}>
+    <div className={cn('flex flex-col', (tab === 'emails' || tab === 'utm') ? 'h-[calc(100vh-4rem-2.25rem)] -m-4 lg:-m-6' : 'space-y-4')}>
       {/* Tabs — always visible */}
       <div className={cn(
         'flex items-center gap-1 border-b border-slate-200 pb-px shrink-0',
-        tab === 'emails' ? 'px-4 lg:px-6 pt-4 lg:pt-6' : '-mt-1',
+        (tab === 'emails' || tab === 'utm') ? 'px-4 lg:px-6 pt-4 lg:pt-6' : '-mt-1',
       )}>
         {/* "Campanhas" title acts as home/list button */}
         <button
@@ -1739,8 +1496,11 @@ export function CampaignsPage() {
           <TemplatesPage embedded />
         </div>
       )}
-      {tab === 'tags' && <TagsManagement showToast={showToast} />}
-      {tab === 'utm' && <UtmDefaultsTab showToast={showToast} />}
+      {tab === 'utm' && (
+        <div className="flex-1 overflow-auto px-4 lg:px-6 py-4">
+          <UtmDefaultsTab showToast={showToast} />
+        </div>
+      )}
 
       {/* Toast */}
       {toast && (

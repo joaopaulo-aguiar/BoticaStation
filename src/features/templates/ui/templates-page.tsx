@@ -820,14 +820,316 @@ export function TemplatesPage({ embedded }: { embedded?: boolean } = {}) {
                 </div>
               )}
 
-              {/* Preview */}
-              {(viewMode === 'preview' || viewMode === 'split') && (
+              {/* Preview — replaced by UTM panel when active */}
+              {(viewMode === 'preview' || viewMode === 'split') && !showUtmPanel && (
                 <div className={cn('flex flex-col min-h-0', viewMode === 'split' ? 'w-1/2' : 'flex-1')}>
                   <PreviewFrame
                     srcDoc={previewSrcDoc}
                     device={previewDevice}
                     onElementClick={handleInspectorClick}
                   />
+                </div>
+              )}
+
+              {/* UTM panel — occupies the preview area */}
+              {showUtmPanel && (viewMode === 'preview' || viewMode === 'split') && (
+                <div className={cn('flex flex-col min-h-0 overflow-y-auto bg-white', viewMode === 'split' ? 'w-1/2' : 'flex-1')}>
+                  <div className="px-4 py-3 space-y-5">
+                    {/* UTM Global Defaults */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Link2 className="w-4 h-4 text-botica-600" />
+                        <span className="text-sm font-semibold text-slate-700">UTM Padrão do Template</span>
+                        <span className="text-[10px] text-slate-400">(fallback quando a campanha não define UTMs)</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="text-[10px] text-slate-500 block mb-1">utm_source</label>
+                          <input
+                            value={utmDefaults.utmSource ?? ''}
+                            onChange={(e) => handleUtmDefaultsChange('utmSource', e.target.value)}
+                            placeholder="newsletter"
+                            className="w-full h-8 text-xs rounded-md border border-slate-200 px-2 focus:outline-none focus:ring-1 focus:ring-botica-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-slate-500 block mb-1">utm_medium</label>
+                          <input
+                            value={utmDefaults.utmMedium ?? ''}
+                            onChange={(e) => handleUtmDefaultsChange('utmMedium', e.target.value)}
+                            placeholder="email"
+                            className="w-full h-8 text-xs rounded-md border border-slate-200 px-2 focus:outline-none focus:ring-1 focus:ring-botica-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-slate-500 block mb-1">utm_campaign</label>
+                          <input
+                            value={utmDefaults.utmCampaign ?? ''}
+                            onChange={(e) => handleUtmDefaultsChange('utmCampaign', e.target.value)}
+                            placeholder="promo-verao"
+                            className="w-full h-8 text-xs rounded-md border border-slate-200 px-2 focus:outline-none focus:ring-1 focus:ring-botica-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* UTM Preview Simulation */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Eye className="w-4 h-4 text-botica-600" />
+                        <span className="text-sm font-semibold text-slate-700">Simular UTMs no Preview</span>
+                        <button
+                          onClick={() => {
+                            setUtmPreviewEnabled(!utmPreviewEnabled)
+                            if (!utmPreviewEnabled && utmDefaults.utmSource) {
+                              setUtmPreviewParams({
+                                utm_source: utmDefaults.utmSource || '',
+                                utm_medium: utmDefaults.utmMedium || 'email',
+                                utm_campaign: utmDefaults.utmCampaign || '',
+                              })
+                            }
+                          }}
+                          className={cn(
+                            'ml-auto text-[10px] px-2 py-0.5 rounded-full font-medium transition-colors cursor-pointer',
+                            utmPreviewEnabled
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-slate-100 text-slate-500 hover:bg-slate-200',
+                          )}
+                        >
+                          {utmPreviewEnabled ? 'Ativo' : 'Inativo'}
+                        </button>
+                      </div>
+                      {utmPreviewEnabled && (
+                        <div className="grid grid-cols-3 gap-3">
+                          <div>
+                            <label className="text-[10px] text-slate-500 block mb-1">utm_source</label>
+                            <input
+                              value={utmPreviewParams.utm_source}
+                              onChange={(e) => setUtmPreviewParams((p) => ({ ...p, utm_source: e.target.value }))}
+                              placeholder="newsletter"
+                              className="w-full h-8 text-xs rounded-md border border-slate-200 px-2 focus:outline-none focus:ring-1 focus:ring-botica-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-500 block mb-1">utm_medium</label>
+                            <input
+                              value={utmPreviewParams.utm_medium}
+                              onChange={(e) => setUtmPreviewParams((p) => ({ ...p, utm_medium: e.target.value }))}
+                              placeholder="email"
+                              className="w-full h-8 text-xs rounded-md border border-slate-200 px-2 focus:outline-none focus:ring-1 focus:ring-botica-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-500 block mb-1">utm_campaign</label>
+                            <input
+                              value={utmPreviewParams.utm_campaign}
+                              onChange={(e) => setUtmPreviewParams((p) => ({ ...p, utm_campaign: e.target.value }))}
+                              placeholder="promo-verao"
+                              className="w-full h-8 text-xs rounded-md border border-slate-200 px-2 focus:outline-none focus:ring-1 focus:ring-botica-500"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Links Analysis Table */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <ExternalLink className="w-4 h-4 text-botica-600" />
+                        <span className="text-sm font-semibold text-slate-700">Links no Template</span>
+                        <Badge className="text-[10px] bg-slate-100 text-slate-600">{extractedLinks.length}</Badge>
+                      </div>
+                      {extractedLinks.length === 0 ? (
+                        <p className="text-xs text-slate-400 italic">Nenhum link encontrado no HTML</p>
+                      ) : (
+                        <div className="border border-slate-200 rounded-md overflow-hidden">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="bg-slate-50 text-slate-500">
+                                <th className="text-left px-3 py-1.5 font-medium">Link</th>
+                                <th className="text-left px-3 py-1.5 font-medium w-20">UTM</th>
+                                <th className="text-left px-3 py-1.5 font-medium w-24">Exclusão</th>
+                                <th className="w-16 px-3 py-1.5" />
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {extractedLinks.map((link, idx) => (
+                                <tr key={idx} className="hover:bg-slate-50">
+                                  <td className="px-3 py-2">
+                                    <button
+                                      onClick={() => handleGoToLinkInEditor(link)}
+                                      className="text-left cursor-pointer hover:text-botica-600 transition-colors"
+                                      title={link.url}
+                                    >
+                                      <div className="font-medium text-slate-700 truncate max-w-sm">{link.text}</div>
+                                      <div className="text-[10px] text-slate-400 truncate max-w-sm">{link.url}</div>
+                                    </button>
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    {!link.isTrackable ? (
+                                      <span className="text-slate-400 text-[10px]">N/A</span>
+                                    ) : link.hasHardcodedUtm ? (
+                                      <Badge className="text-[9px] bg-green-100 text-green-700">Manual</Badge>
+                                    ) : link.excludeFromUtm ? (
+                                      <Badge className="text-[9px] bg-red-100 text-red-600">Excluído</Badge>
+                                    ) : (
+                                      <Badge className="text-[9px] bg-blue-100 text-blue-700">Auto</Badge>
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    {link.isTrackable && !link.hasHardcodedUtm && (
+                                      <button
+                                        onClick={() => handleToggleLinkNoUtm(link, !link.excludeFromUtm)}
+                                        className={cn(
+                                          'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer',
+                                          link.excludeFromUtm
+                                            ? 'bg-red-50 text-red-600 hover:bg-red-100'
+                                            : 'bg-slate-50 text-slate-500 hover:bg-slate-100',
+                                        )}
+                                        title={link.excludeFromUtm ? 'Reativar injeção de UTM' : 'Excluir da injeção automática de UTM'}
+                                      >
+                                        <ShieldOff className="w-3 h-3" />
+                                        {link.excludeFromUtm ? 'Excluído' : 'Excluir'}
+                                      </button>
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-2 text-right">
+                                    <button
+                                      onClick={() => { setSelectedLinkForEdit(link); setLinkEditorDialog(true) }}
+                                      className="text-slate-400 hover:text-botica-600 cursor-pointer"
+                                      title="Editar UTM deste link"
+                                    >
+                                      <MoreVertical className="w-3.5 h-3.5" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* UTM panel — full-width when in code-only mode */}
+              {showUtmPanel && viewMode === 'code' && (
+                <div className="flex-1 flex flex-col min-h-0 overflow-y-auto bg-white border-l border-slate-200">
+                  <div className="px-4 py-3 space-y-5">
+                    {/* UTM Global Defaults */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <Link2 className="w-4 h-4 text-botica-600" />
+                        <span className="text-sm font-semibold text-slate-700">UTM Padrão do Template</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <label className="text-[10px] text-slate-500 block mb-1">utm_source</label>
+                          <input
+                            value={utmDefaults.utmSource ?? ''}
+                            onChange={(e) => handleUtmDefaultsChange('utmSource', e.target.value)}
+                            placeholder="newsletter"
+                            className="w-full h-8 text-xs rounded-md border border-slate-200 px-2 focus:outline-none focus:ring-1 focus:ring-botica-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-slate-500 block mb-1">utm_medium</label>
+                          <input
+                            value={utmDefaults.utmMedium ?? ''}
+                            onChange={(e) => handleUtmDefaultsChange('utmMedium', e.target.value)}
+                            placeholder="email"
+                            className="w-full h-8 text-xs rounded-md border border-slate-200 px-2 focus:outline-none focus:ring-1 focus:ring-botica-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-slate-500 block mb-1">utm_campaign</label>
+                          <input
+                            value={utmDefaults.utmCampaign ?? ''}
+                            onChange={(e) => handleUtmDefaultsChange('utmCampaign', e.target.value)}
+                            placeholder="promo-verao"
+                            className="w-full h-8 text-xs rounded-md border border-slate-200 px-2 focus:outline-none focus:ring-1 focus:ring-botica-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Links Table */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <ExternalLink className="w-4 h-4 text-botica-600" />
+                        <span className="text-sm font-semibold text-slate-700">Links no Template</span>
+                        <Badge className="text-[10px] bg-slate-100 text-slate-600">{extractedLinks.length}</Badge>
+                      </div>
+                      {extractedLinks.length === 0 ? (
+                        <p className="text-xs text-slate-400 italic">Nenhum link encontrado no HTML</p>
+                      ) : (
+                        <div className="border border-slate-200 rounded-md overflow-hidden">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="bg-slate-50 text-slate-500">
+                                <th className="text-left px-3 py-1.5 font-medium">Link</th>
+                                <th className="text-left px-3 py-1.5 font-medium w-20">UTM</th>
+                                <th className="text-left px-3 py-1.5 font-medium w-24">Exclusão</th>
+                                <th className="w-16 px-3 py-1.5" />
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {extractedLinks.map((link, idx) => (
+                                <tr key={idx} className="hover:bg-slate-50">
+                                  <td className="px-3 py-2">
+                                    <button
+                                      onClick={() => handleGoToLinkInEditor(link)}
+                                      className="text-left cursor-pointer hover:text-botica-600 transition-colors"
+                                      title={link.url}
+                                    >
+                                      <div className="font-medium text-slate-700 truncate max-w-sm">{link.text}</div>
+                                      <div className="text-[10px] text-slate-400 truncate max-w-sm">{link.url}</div>
+                                    </button>
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    {!link.isTrackable ? (
+                                      <span className="text-slate-400 text-[10px]">N/A</span>
+                                    ) : link.hasHardcodedUtm ? (
+                                      <Badge className="text-[9px] bg-green-100 text-green-700">Manual</Badge>
+                                    ) : link.excludeFromUtm ? (
+                                      <Badge className="text-[9px] bg-red-100 text-red-600">Excluído</Badge>
+                                    ) : (
+                                      <Badge className="text-[9px] bg-blue-100 text-blue-700">Auto</Badge>
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    {link.isTrackable && !link.hasHardcodedUtm && (
+                                      <button
+                                        onClick={() => handleToggleLinkNoUtm(link, !link.excludeFromUtm)}
+                                        className={cn(
+                                          'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer',
+                                          link.excludeFromUtm
+                                            ? 'bg-red-50 text-red-600 hover:bg-red-100'
+                                            : 'bg-slate-50 text-slate-500 hover:bg-slate-100',
+                                        )}
+                                      >
+                                        <ShieldOff className="w-3 h-3" />
+                                        {link.excludeFromUtm ? 'Excluído' : 'Excluir'}
+                                      </button>
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-2 text-right">
+                                    <button
+                                      onClick={() => { setSelectedLinkForEdit(link); setLinkEditorDialog(true) }}
+                                      className="text-slate-400 hover:text-botica-600 cursor-pointer"
+                                    >
+                                      <MoreVertical className="w-3.5 h-3.5" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -865,188 +1167,6 @@ export function TemplatesPage({ embedded }: { embedded?: boolean } = {}) {
                 <p className="text-[10px] text-amber-600 mt-1">
                   Revise se necessário. Links com <code className="bg-amber-100 px-0.5 rounded">data-no-utm</code> serão ignorados.
                 </p>
-              </div>
-            )}
-
-            {/* UTM & Links Panel */}
-            {showUtmPanel && (
-              <div className="border-t border-slate-200 bg-white max-h-72 overflow-y-auto">
-                <div className="px-4 py-3 space-y-4">
-                  {/* UTM Global Defaults */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Link2 className="w-3.5 h-3.5 text-botica-600" />
-                      <span className="text-xs font-semibold text-slate-700">UTM Padrão do Template</span>
-                      <span className="text-[10px] text-slate-400">(fallback quando a campanha não define UTMs)</span>
-                    </div>
-                    <div className="flex gap-2 items-end">
-                      <div className="w-36">
-                        <label className="text-[10px] text-slate-500 block">utm_source</label>
-                        <input
-                          value={utmDefaults.utmSource ?? ''}
-                          onChange={(e) => handleUtmDefaultsChange('utmSource', e.target.value)}
-                          placeholder="newsletter"
-                          className="w-full h-7 text-xs rounded-md border border-slate-200 px-2 focus:outline-none focus:ring-1 focus:ring-botica-500"
-                        />
-                      </div>
-                      <div className="w-36">
-                        <label className="text-[10px] text-slate-500 block">utm_medium</label>
-                        <input
-                          value={utmDefaults.utmMedium ?? ''}
-                          onChange={(e) => handleUtmDefaultsChange('utmMedium', e.target.value)}
-                          placeholder="email"
-                          className="w-full h-7 text-xs rounded-md border border-slate-200 px-2 focus:outline-none focus:ring-1 focus:ring-botica-500"
-                        />
-                      </div>
-                      <div className="w-44">
-                        <label className="text-[10px] text-slate-500 block">utm_campaign</label>
-                        <input
-                          value={utmDefaults.utmCampaign ?? ''}
-                          onChange={(e) => handleUtmDefaultsChange('utmCampaign', e.target.value)}
-                          placeholder="promo-verao"
-                          className="w-full h-7 text-xs rounded-md border border-slate-200 px-2 focus:outline-none focus:ring-1 focus:ring-botica-500"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* UTM Preview Simulation */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Eye className="w-3.5 h-3.5 text-botica-600" />
-                      <span className="text-xs font-semibold text-slate-700">Simular UTMs no Preview</span>
-                      <button
-                        onClick={() => {
-                          setUtmPreviewEnabled(!utmPreviewEnabled)
-                          if (!utmPreviewEnabled && utmDefaults.utmSource) {
-                            setUtmPreviewParams({
-                              utm_source: utmDefaults.utmSource || '',
-                              utm_medium: utmDefaults.utmMedium || 'email',
-                              utm_campaign: utmDefaults.utmCampaign || '',
-                            })
-                          }
-                        }}
-                        className={cn(
-                          'ml-auto text-[10px] px-2 py-0.5 rounded-full font-medium transition-colors cursor-pointer',
-                          utmPreviewEnabled
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200',
-                        )}
-                      >
-                        {utmPreviewEnabled ? 'Ativo' : 'Inativo'}
-                      </button>
-                    </div>
-                    {utmPreviewEnabled && (
-                      <div className="flex gap-2 items-end">
-                        <div className="w-36">
-                          <label className="text-[10px] text-slate-500 block">utm_source</label>
-                          <input
-                            value={utmPreviewParams.utm_source}
-                            onChange={(e) => setUtmPreviewParams((p) => ({ ...p, utm_source: e.target.value }))}
-                            placeholder="newsletter"
-                            className="w-full h-7 text-xs rounded-md border border-slate-200 px-2 focus:outline-none focus:ring-1 focus:ring-botica-500"
-                          />
-                        </div>
-                        <div className="w-36">
-                          <label className="text-[10px] text-slate-500 block">utm_medium</label>
-                          <input
-                            value={utmPreviewParams.utm_medium}
-                            onChange={(e) => setUtmPreviewParams((p) => ({ ...p, utm_medium: e.target.value }))}
-                            placeholder="email"
-                            className="w-full h-7 text-xs rounded-md border border-slate-200 px-2 focus:outline-none focus:ring-1 focus:ring-botica-500"
-                          />
-                        </div>
-                        <div className="w-44">
-                          <label className="text-[10px] text-slate-500 block">utm_campaign</label>
-                          <input
-                            value={utmPreviewParams.utm_campaign}
-                            onChange={(e) => setUtmPreviewParams((p) => ({ ...p, utm_campaign: e.target.value }))}
-                            placeholder="promo-verao"
-                            className="w-full h-7 text-xs rounded-md border border-slate-200 px-2 focus:outline-none focus:ring-1 focus:ring-botica-500"
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Links Analysis Table */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <ExternalLink className="w-3.5 h-3.5 text-botica-600" />
-                      <span className="text-xs font-semibold text-slate-700">Links no Template</span>
-                      <Badge className="text-[10px] bg-slate-100 text-slate-600">{extractedLinks.length}</Badge>
-                    </div>
-                    {extractedLinks.length === 0 ? (
-                      <p className="text-xs text-slate-400 italic">Nenhum link encontrado no HTML</p>
-                    ) : (
-                      <div className="border border-slate-200 rounded-md overflow-hidden max-h-40 overflow-y-auto">
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className="bg-slate-50 text-slate-500">
-                              <th className="text-left px-2 py-1 font-medium">Link</th>
-                              <th className="text-left px-2 py-1 font-medium w-20">UTM</th>
-                              <th className="text-left px-2 py-1 font-medium w-24">Exclusão</th>
-                              <th className="w-16 px-2 py-1" />
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            {extractedLinks.map((link, idx) => (
-                              <tr key={idx} className="hover:bg-slate-50">
-                                <td className="px-2 py-1.5">
-                                  <button
-                                    onClick={() => handleGoToLinkInEditor(link)}
-                                    className="text-left cursor-pointer hover:text-botica-600 transition-colors"
-                                    title={link.url}
-                                  >
-                                    <div className="font-medium text-slate-700 truncate max-w-xs">{link.text}</div>
-                                    <div className="text-[10px] text-slate-400 truncate max-w-xs">{link.url}</div>
-                                  </button>
-                                </td>
-                                <td className="px-2 py-1.5">
-                                  {!link.isTrackable ? (
-                                    <span className="text-slate-400 text-[10px]">N/A</span>
-                                  ) : link.hasHardcodedUtm ? (
-                                    <Badge className="text-[9px] bg-green-100 text-green-700">Manual</Badge>
-                                  ) : link.excludeFromUtm ? (
-                                    <Badge className="text-[9px] bg-red-100 text-red-600">Excluído</Badge>
-                                  ) : (
-                                    <Badge className="text-[9px] bg-blue-100 text-blue-700">Auto</Badge>
-                                  )}
-                                </td>
-                                <td className="px-2 py-1.5">
-                                  {link.isTrackable && !link.hasHardcodedUtm && (
-                                    <button
-                                      onClick={() => handleToggleLinkNoUtm(link, !link.excludeFromUtm)}
-                                      className={cn(
-                                        'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer',
-                                        link.excludeFromUtm
-                                          ? 'bg-red-50 text-red-600 hover:bg-red-100'
-                                          : 'bg-slate-50 text-slate-500 hover:bg-slate-100',
-                                      )}
-                                      title={link.excludeFromUtm ? 'Reativar injeção de UTM' : 'Excluir da injeção automática de UTM'}
-                                    >
-                                      <ShieldOff className="w-3 h-3" />
-                                      {link.excludeFromUtm ? 'Excluído' : 'Excluir'}
-                                    </button>
-                                  )}
-                                </td>
-                                <td className="px-2 py-1.5 text-right">
-                                  <button
-                                    onClick={() => { setSelectedLinkForEdit(link); setLinkEditorDialog(true) }}
-                                    className="text-slate-400 hover:text-botica-600 cursor-pointer"
-                                    title="Editar UTM deste link"
-                                  >
-                                    <MoreVertical className="w-3.5 h-3.5" />
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                </div>
               </div>
             )}
 

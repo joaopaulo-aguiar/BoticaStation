@@ -2,6 +2,7 @@ import { generateClient } from 'aws-amplify/api'
 import type {
   Contact,
   ContactListResult,
+  ContactCounters,
   CreateContactInput,
   UpdateContactInput,
   ContactFilterInput,
@@ -27,6 +28,15 @@ const CONTACT_FIELDS = /* GraphQL */ `
       lifetimeEarned
       expiryDate
     }
+    ecommerceInfo {
+      paidOrders
+      revenue
+      avgTicket
+      lastPurchaseAt
+      abandonedCarts
+      abandonedCartValue
+    }
+    legalBasis
     tags
     createdAt
     updatedAt
@@ -100,6 +110,24 @@ export async function findContactByEmail(email: string): Promise<Contact | null>
   `
   const { data } = await client.graphql({ query, variables: { email } }) as { data: { findContactByEmail: Contact | null } }
   return data.findContactByEmail
+}
+
+export async function getContactCounters(): Promise<ContactCounters> {
+  const query = /* GraphQL */ `
+    query GetContactCounters {
+      getContactCounters {
+        total
+        byLifecycle {
+          lead
+          subscriber
+          customer
+        }
+        updatedAt
+      }
+    }
+  `
+  const { data } = await client.graphql({ query }) as { data: { getContactCounters: ContactCounters } }
+  return data.getContactCounters
 }
 
 // ── Mutations ────────────────────────────────────────────────────────────────

@@ -360,7 +360,6 @@ async function duplicateCampaign(id, caller) {
     configurationSet: campaign.configurationSet ?? null,
     scheduleArn: null,
     timezone: campaign.timezone ?? null,
-    campaignTags: campaign.campaignTags ?? null,
     utmParams: campaign.utmParams ?? null,
     estimatedRecipients: null,
     createdAt: now,

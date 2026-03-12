@@ -7,6 +7,7 @@ import {
   deleteContact,
   importContacts,
   listContactEvents,
+  getContactCounters,
 } from '../api/contacts-api'
 import type {
   ContactFilterInput,
@@ -18,6 +19,7 @@ import type {
 
 const CONTACTS_KEY = ['contacts'] as const
 const EVENTS_KEY = ['contact-events'] as const
+const COUNTERS_KEY = ['contact-counters'] as const
 
 export function useContactsList(
   pageSize?: number,
@@ -28,6 +30,14 @@ export function useContactsList(
   return useQuery({
     queryKey: [...CONTACTS_KEY, 'list', pageSize, nextToken, filter, sort],
     queryFn: () => listContacts(pageSize, nextToken, filter, sort),
+  })
+}
+
+export function useContactCounters() {
+  return useQuery({
+    queryKey: [...COUNTERS_KEY],
+    queryFn: () => getContactCounters(),
+    staleTime: 60_000, // 1 min cache
   })
 }
 
@@ -43,7 +53,10 @@ export function useCreateContact() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (input: CreateContactInput) => createContact(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: CONTACTS_KEY }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: CONTACTS_KEY })
+      qc.invalidateQueries({ queryKey: COUNTERS_KEY })
+    },
   })
 }
 
@@ -59,7 +72,10 @@ export function useDeleteContact() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => deleteContact(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: CONTACTS_KEY }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: CONTACTS_KEY })
+      qc.invalidateQueries({ queryKey: COUNTERS_KEY })
+    },
   })
 }
 
@@ -67,7 +83,10 @@ export function useImportContacts() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (inputs: CreateContactInput[]) => importContacts(inputs),
-    onSuccess: () => qc.invalidateQueries({ queryKey: CONTACTS_KEY }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: CONTACTS_KEY })
+      qc.invalidateQueries({ queryKey: COUNTERS_KEY })
+    },
   })
 }
 

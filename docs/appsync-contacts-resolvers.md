@@ -30,6 +30,8 @@
 | status | String | `active` / `inactive` |
 | source | String | `manual_input` / `import_csv` |
 | cashbackInfo | Map | `{ currentBalance, lifetimeEarned, expiryDate }` |
+| ecommerceInfo | Map | `{ paidOrders, revenue, avgTicket, lastPurchaseAt, abandonedCarts, abandonedCartValue }` |
+| legalBasis | String | `accepted` / null — Base legal LGPD |
 | stats | Map | `{ emailSends, emailDeliveries, emailOpens, emailClicks, emailBounces, emailComplaints, smsSends, smsDeliveries }` — contadores atômicos atualizados via Lambda |
 | createdAt | String | ISO 8601 |
 | updatedAt | String | ISO 8601 |

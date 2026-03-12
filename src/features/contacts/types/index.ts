@@ -17,6 +17,27 @@ export interface ContactStats {
   smsDeliveries: number
 }
 
+export interface EcommerceInfo {
+  paidOrders: number
+  revenue: number
+  avgTicket: number
+  lastPurchaseAt: string | null
+  abandonedCarts: number
+  abandonedCartValue: number
+}
+
+export interface LifecycleCounts {
+  lead: number
+  subscriber: number
+  customer: number
+}
+
+export interface ContactCounters {
+  total: number
+  byLifecycle: LifecycleCounts
+  updatedAt: string | null
+}
+
 export interface Contact {
   id: string
   email: string
@@ -24,6 +45,8 @@ export interface Contact {
   fullName: string
   lifecycleStage: string
   cashbackInfo: CashbackInfo | null
+  ecommerceInfo: EcommerceInfo | null
+  legalBasis: string | null
   tags: string[]
   stats: ContactStats | null
   createdAt: string
