@@ -131,13 +131,14 @@ async function taskAddTag(event) {
     await ddb.send(new UpdateCommand({
       TableName: TABLE_NAME,
       Key: { PK: pk, SK: 'METADATA' },
-      UpdateExpression: 'SET tags = list_append(if_not_exists(tags, :empty), :newTag), updatedAt = :now',
+      UpdateExpression: 'SET tags = list_append(if_not_exists(tags, :empty), :newTag), updatedAt = :now, _triggerSource = :src',
       ConditionExpression: 'NOT contains(tags, :tagVal)',
       ExpressionAttributeValues: {
         ':newTag': [tagId],
         ':empty': [],
         ':tagVal': tagId,
         ':now': now,
+        ':src': 'automation',
       },
     }));
   } catch (err) {
@@ -167,8 +168,8 @@ async function taskRemoveTag(event) {
   await ddb.send(new UpdateCommand({
     TableName: TABLE_NAME,
     Key: { PK: pk, SK: 'METADATA' },
-    UpdateExpression: `REMOVE tags[${idx}] SET updatedAt = :now`,
-    ExpressionAttributeValues: { ':now': now },
+    UpdateExpression: `REMOVE tags[${idx}] SET updatedAt = :now, _triggerSource = :src`,
+    ExpressionAttributeValues: { ':now': now, ':src': 'automation' },
   }));
 
   return { success: true, action: 'REMOVE_TAG', contactId, tagId };
@@ -182,8 +183,8 @@ async function taskChangeLifecycle(event) {
   await ddb.send(new UpdateCommand({
     TableName: TABLE_NAME,
     Key: { PK: pk, SK: 'METADATA' },
-    UpdateExpression: 'SET lifecycleStage = :stage, updatedAt = :now',
-    ExpressionAttributeValues: { ':stage': newStage, ':now': now },
+    UpdateExpression: 'SET lifecycleStage = :stage, updatedAt = :now, _triggerSource = :src',
+    ExpressionAttributeValues: { ':stage': newStage, ':now': now, ':src': 'automation' },
   }));
 
   return { success: true, action: 'CHANGE_LIFECYCLE', contactId, newStage };
@@ -197,9 +198,9 @@ async function taskChangeStatus(event) {
   await ddb.send(new UpdateCommand({
     TableName: TABLE_NAME,
     Key: { PK: pk, SK: 'METADATA' },
-    UpdateExpression: 'SET #status = :status, updatedAt = :now',
+    UpdateExpression: 'SET #status = :status, updatedAt = :now, _triggerSource = :src',
     ExpressionAttributeNames: { '#status': 'status' },
-    ExpressionAttributeValues: { ':status': newStatus, ':now': now },
+    ExpressionAttributeValues: { ':status': newStatus, ':now': now, ':src': 'automation' },
   }));
 
   return { success: true, action: 'CHANGE_STATUS', contactId, newStatus };

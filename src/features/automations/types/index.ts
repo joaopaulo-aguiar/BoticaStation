@@ -9,6 +9,9 @@ export type TriggerType =
   | 'LIFECYCLE_CHANGED'
   | 'EVENT_OCCURRED'
   | 'FORM_SUBMITTED'
+  | 'CONTACT_CREATED'
+  | 'PURCHASE_MADE'
+  | 'CART_ABANDONED'
 
 export interface TriggerConfig {
   type: TriggerType
@@ -193,11 +196,14 @@ export interface ValidationError {
 // ── UI Config ────────────────────────────────────────────────────────────────
 
 export const TRIGGER_TYPES: { value: TriggerType; label: string; description: string; icon: string }[] = [
+  { value: 'CONTACT_CREATED', label: 'Novo contato', description: 'Quando um novo contato é criado', icon: '👤' },
   { value: 'TAG_ADDED', label: 'Tag adicionada', description: 'Quando um contato recebe uma tag', icon: '🏷️' },
   { value: 'TAG_REMOVED', label: 'Tag removida', description: 'Quando uma tag é removida de um contato', icon: '🏷️' },
-  { value: 'ENTERED_LIST', label: 'Entrou na lista', description: 'Quando um contato entra em um segmento', icon: '📋' },
-  { value: 'LIFECYCLE_CHANGED', label: 'Mudou de estágio', description: 'Quando o lifecycle stage muda', icon: '🔄' },
-  { value: 'EVENT_OCCURRED', label: 'Evento ocorreu', description: 'Quando um evento específico acontece', icon: '⚡' },
+  { value: 'ENTERED_LIST', label: 'Entrou na segmentação', description: 'Quando entra em uma lista de segmentação', icon: '📋' },
+  { value: 'LIFECYCLE_CHANGED', label: 'Mudou de estágio', description: 'Quando o estágio do funil muda', icon: '🔄' },
+  { value: 'PURCHASE_MADE', label: 'Realizou compra', description: 'Quando uma compra é registrada', icon: '🛒' },
+  { value: 'CART_ABANDONED', label: 'Carrinho abandonado', description: 'Quando um carrinho é abandonado', icon: '🛒' },
+  { value: 'EVENT_OCCURRED', label: 'Evento personalizado', description: 'Quando um evento específico acontece', icon: '⚡' },
   { value: 'FORM_SUBMITTED', label: 'Formulário enviado', description: 'Quando um formulário é submetido', icon: '📝' },
 ]
 

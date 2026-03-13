@@ -2,7 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/features/auth'
 import {
   Users, BarChart3, Wallet, Settings, LogOut, Menu,
-  LayoutDashboard, X, Workflow, Megaphone, ArrowRightLeft, Mail,
+  LayoutDashboard, X, Workflow, Megaphone, ArrowRightLeft, Mail, Ticket,
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/shared/lib/utils'
@@ -23,6 +23,7 @@ const navigation: NavItem[] = [
   { name: 'Transacionais', href: '/transactional', icon: ArrowRightLeft },
   { name: 'Automações', href: '/automations', icon: Workflow },
   { name: 'Cashback', href: '/cashback', icon: Wallet },
+  { name: 'Cupons', href: '/coupons', icon: Ticket },
   { name: 'Relatórios', href: '/reports', icon: BarChart3 },
   { name: 'Configurações', href: '/settings', icon: Settings, roles: ['ADMIN'] },
 ]

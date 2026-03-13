@@ -1,9 +1,10 @@
-import { useState, useCallback, useRef, useMemo } from 'react'
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import {
   Workflow, Plus, Search, Trash2, Pencil, Play, Pause, Save,
   RefreshCw, AlertCircle, Check, X as XIcon,
   AlertTriangle, Mail, Tag, Clock, GitBranch, Flag,
-  Zap, Copy, Eye, Activity, StopCircle, User, ArrowRight,
+  Zap, Copy, Activity, StopCircle, User, ArrowRight,
+  Code2, MousePointerClick,
 } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
@@ -254,7 +255,7 @@ function AutomationListView({ onEdit, showToast }: { onEdit: () => void; showToa
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Node Visual Components
+   Node Visual Components — Compact Redesign
    ═══════════════════════════════════════════════════════════════════════════ */
 
 const NODE_ICONS: Record<NodeType, typeof Mail> = {
@@ -268,13 +269,13 @@ const NODE_ICONS: Record<NodeType, typeof Mail> = {
 }
 
 const NODE_COLORS: Record<NodeType, { bg: string; border: string; text: string; iconBg: string }> = {
-  ACTION_SEND_EMAIL: { bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-700', iconBg: 'bg-blue-500' },
-  ACTION_ADD_TAG: { bg: 'bg-emerald-50', border: 'border-emerald-300', text: 'text-emerald-700', iconBg: 'bg-emerald-500' },
-  ACTION_REMOVE_TAG: { bg: 'bg-amber-50', border: 'border-amber-300', text: 'text-amber-700', iconBg: 'bg-amber-500' },
-  ACTION_CHANGE_LIFECYCLE: { bg: 'bg-violet-50', border: 'border-violet-300', text: 'text-violet-700', iconBg: 'bg-violet-500' },
-  WAIT: { bg: 'bg-orange-50', border: 'border-orange-300', text: 'text-orange-700', iconBg: 'bg-orange-500' },
-  CONDITION: { bg: 'bg-rose-50', border: 'border-rose-300', text: 'text-rose-700', iconBg: 'bg-rose-500' },
-  END: { bg: 'bg-slate-50', border: 'border-slate-300', text: 'text-slate-600', iconBg: 'bg-slate-500' },
+  ACTION_SEND_EMAIL: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', iconBg: 'bg-blue-500' },
+  ACTION_ADD_TAG: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', iconBg: 'bg-emerald-500' },
+  ACTION_REMOVE_TAG: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', iconBg: 'bg-amber-500' },
+  ACTION_CHANGE_LIFECYCLE: { bg: 'bg-violet-50', border: 'border-violet-200', text: 'text-violet-700', iconBg: 'bg-violet-500' },
+  WAIT: { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', iconBg: 'bg-orange-500' },
+  CONDITION: { bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-700', iconBg: 'bg-rose-500' },
+  END: { bg: 'bg-slate-50', border: 'border-slate-300', text: 'text-slate-600', iconBg: 'bg-slate-400' },
 }
 
 function getNodeSummary(node: CanvasNode): string {
@@ -301,64 +302,112 @@ function getNodeSummary(node: CanvasNode): string {
   }
 }
 
-function CanvasNodeCard({
-  node, isSelected, onSelect, onAddAfter, onRemove,
+/* ── Trigger Start Card (top of canvas) ──────────────────────────────────── */
+
+function TriggerStartCard({
+  trigger, isSelected, onSelect,
 }: {
-  node: CanvasNode
+  trigger: TriggerConfig
   isSelected: boolean
   onSelect: () => void
-  onAddAfter: () => void
-  onRemove: () => void
 }) {
-  const config = NODE_TYPES.find((t) => t.value === node.type)
-  const colors = NODE_COLORS[node.type]
-  const Icon = NODE_ICONS[node.type]
+  const triggerInfo = TRIGGER_TYPES.find((t) => t.value === trigger.type)
+  const hasParams = trigger.params.tagId || trigger.params.segmentId || trigger.params.eventType
 
   return (
     <div
       className={cn(
-        'relative group rounded-xl border-2 shadow-sm transition-all cursor-pointer select-none',
-        colors.bg, colors.border,
-        isSelected && 'ring-2 ring-botica-400 ring-offset-2 shadow-lg',
-        'hover:shadow-md w-64',
+        'rounded-lg border-2 shadow-sm transition-all cursor-pointer select-none w-52',
+        'bg-gradient-to-br from-violet-50 to-indigo-50 border-violet-300',
+        isSelected && 'ring-2 ring-violet-400 ring-offset-2 shadow-md',
+        'hover:shadow-md',
       )}
       onClick={(e) => { e.stopPropagation(); onSelect() }}
     >
-      <div className="flex items-center gap-3 p-3">
-        <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center shrink-0', colors.iconBg)}>
-          <Icon className="w-4 h-4 text-white" />
+      <div className="flex items-center gap-2.5 px-3 py-2.5">
+        <div className="w-7 h-7 rounded-lg bg-violet-500 flex items-center justify-center shrink-0">
+          <Zap className="w-3.5 h-3.5 text-white" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className={cn('text-xs font-bold', colors.text)}>{config?.label ?? node.type}</div>
-          <div className="text-[10px] text-slate-500 truncate">{getNodeSummary(node)}</div>
+          <div className="text-[10px] font-bold text-violet-500 uppercase tracking-wider">Início</div>
+          <div className="text-xs font-semibold text-violet-800 truncate">{triggerInfo?.label ?? 'Selecionar gatilho'}</div>
+          {hasParams && (
+            <div className="text-[10px] text-violet-500 truncate mt-0.5">
+              {trigger.params.tagId && `Tag: ${trigger.params.tagId}`}
+              {trigger.params.segmentId && `Segmento: ${trigger.params.segmentId}`}
+              {trigger.params.eventType && `Evento: ${trigger.params.eventType}`}
+            </div>
+          )}
         </div>
-        {node.type !== 'END' && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onRemove() }}
-            className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-100 text-slate-300 hover:text-red-500 transition-all cursor-pointer"
-          >
-            <XIcon className="w-3.5 h-3.5" />
-          </button>
-        )}
       </div>
+    </div>
+  )
+}
 
-      {/* Condition branches labels */}
-      {node.type === 'CONDITION' && (
-        <div className="flex justify-between px-3 pb-2 -mt-1">
-          <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">SIM ↓</span>
-          <span className="text-[9px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">NÃO ↓</span>
+/* ── Compact Node Card ───────────────────────────────────────────────────── */
+
+function CanvasNodeCard({
+  node, isSelected, onSelect, onRemove,
+}: {
+  node: CanvasNode
+  isSelected: boolean
+  onSelect: () => void
+  onRemove: () => void
+  isFirst?: boolean
+}) {
+  const config = NODE_TYPES.find((t) => t.value === node.type)
+  const colors = NODE_COLORS[node.type]
+  const Icon = NODE_ICONS[node.type]
+  const isEnd = node.type === 'END'
+
+  if (isEnd) {
+    return (
+      <div
+        className={cn(
+          'rounded-lg border-2 border-dashed shadow-sm transition-all cursor-pointer select-none w-52',
+          'bg-slate-50 border-slate-300',
+          isSelected && 'ring-2 ring-slate-400 ring-offset-2',
+          'hover:shadow-md',
+        )}
+        onClick={(e) => { e.stopPropagation(); onSelect() }}
+      >
+        <div className="flex items-center justify-center gap-2 px-3 py-2">
+          <Flag className="w-3.5 h-3.5 text-slate-400" />
+          <span className="text-xs font-medium text-slate-500">Fim do Fluxo</span>
         </div>
-      )}
+      </div>
+    )
+  }
 
-      {/* Add node button below */}
-      {node.type !== 'END' && (
-        <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all z-10">
-          <button
-            onClick={(e) => { e.stopPropagation(); onAddAfter() }}
-            className="w-6 h-6 rounded-full bg-botica-500 text-white flex items-center justify-center shadow-md hover:bg-botica-600 transition-colors cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
+  return (
+    <div
+      className={cn(
+        'group rounded-lg border shadow-sm transition-all cursor-pointer select-none w-52',
+        colors.bg, colors.border,
+        isSelected && 'ring-2 ring-botica-400 ring-offset-2 shadow-md',
+        'hover:shadow-md',
+      )}
+      onClick={(e) => { e.stopPropagation(); onSelect() }}
+    >
+      <div className="flex items-center gap-2 px-2.5 py-2">
+        <div className={cn('w-6 h-6 rounded flex items-center justify-center shrink-0', colors.iconBg)}>
+          <Icon className="w-3 h-3 text-white" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className={cn('text-[11px] font-bold leading-tight', colors.text)}>{config?.label ?? node.type}</div>
+          <div className="text-[10px] text-slate-500 truncate leading-tight">{getNodeSummary(node)}</div>
+        </div>
+        <button
+          onClick={(e) => { e.stopPropagation(); onRemove() }}
+          className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-red-100 text-slate-300 hover:text-red-500 transition-all cursor-pointer"
+        >
+          <XIcon className="w-3 h-3" />
+        </button>
+      </div>
+      {node.type === 'CONDITION' && (
+        <div className="flex justify-between px-2.5 pb-1.5 -mt-0.5">
+          <span className="text-[8px] font-bold text-emerald-600 bg-emerald-100 px-1 py-px rounded">SIM</span>
+          <span className="text-[8px] font-bold text-red-500 bg-red-100 px-1 py-px rounded">NÃO</span>
         </div>
       )}
     </div>
@@ -366,21 +415,56 @@ function CanvasNodeCard({
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Connection Lines (SVG)
+   Inline Add-Node Button (between nodes in the flow)
    ═══════════════════════════════════════════════════════════════════════════ */
 
-function ConnectionLine({ from, to, label }: { from: { x: number; y: number }; to: { x: number; y: number }; label?: string }) {
-  const midY = (from.y + to.y) / 2
-  const pathD = `M ${from.x} ${from.y} C ${from.x} ${midY}, ${to.x} ${midY}, ${to.x} ${to.y}`
+function InlineAddButton({ onAdd }: { onAdd: (type: NodeType) => void }) {
+  const [open, setOpen] = useState(false)
+
+  const categories = [
+    { label: 'Ações', items: NODE_TYPES.filter((n) => n.category === 'action') },
+    { label: 'Fluxo', items: NODE_TYPES.filter((n) => n.category === 'flow') },
+    { label: 'Fim', items: NODE_TYPES.filter((n) => n.category === 'end') },
+  ]
 
   return (
-    <g>
-      <path d={pathD} fill="none" stroke="#cbd5e1" strokeWidth={2} strokeDasharray="6 3" />
-      <circle cx={to.x} cy={to.y} r={4} fill="#94a3b8" />
-      {label && (
-        <text x={(from.x + to.x) / 2} y={midY - 6} textAnchor="middle" className="fill-slate-400 text-[9px] font-bold">{label}</text>
+    <div className="flex flex-col items-center py-1 relative">
+      <div className="w-px h-4 bg-slate-300" />
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(!open) }}
+        className={cn(
+          'w-5 h-5 rounded-full flex items-center justify-center transition-all cursor-pointer z-10',
+          open ? 'bg-botica-500 text-white shadow-md' : 'bg-slate-200 text-slate-400 hover:bg-botica-500 hover:text-white hover:shadow-md',
+        )}
+      >
+        <Plus className="w-3 h-3" />
+      </button>
+      <div className="w-px h-4 bg-slate-300" />
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-1 bg-white rounded-lg border border-slate-200 shadow-xl p-2 w-56">
+            {categories.map((cat) => (
+              <div key={cat.label} className="mb-1 last:mb-0">
+                <div className="text-[9px] text-slate-400 font-bold uppercase tracking-wider px-2 mb-0.5">{cat.label}</div>
+                {cat.items.map((item) => (
+                  <button
+                    key={item.value}
+                    onClick={(e) => { e.stopPropagation(); onAdd(item.value); setOpen(false) }}
+                    className="flex items-center gap-2 w-full px-2 py-1 rounded text-left hover:bg-slate-50 transition-colors cursor-pointer"
+                  >
+                    <span className={cn('w-5 h-5 rounded flex items-center justify-center text-white text-[9px]', item.color)}>{item.icon}</span>
+                    <div>
+                      <div className="text-[11px] font-medium text-slate-700">{item.label}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        </>
       )}
-    </g>
+    </div>
   )
 }
 
@@ -395,27 +479,27 @@ function NodePropertiesPanel({ node, onClose }: { node: CanvasNode; onClose: () 
   const Icon = NODE_ICONS[node.type]
 
   return (
-    <div className="w-80 shrink-0 border-l border-slate-200 bg-white overflow-y-auto">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+    <div className="w-72 shrink-0 border-l border-slate-200 bg-white overflow-y-auto">
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-100">
         <div className="flex items-center gap-2">
-          <div className={cn('w-6 h-6 rounded flex items-center justify-center', colors.iconBg)}>
-            <Icon className="w-3.5 h-3.5 text-white" />
+          <div className={cn('w-5 h-5 rounded flex items-center justify-center', colors.iconBg)}>
+            <Icon className="w-3 h-3 text-white" />
           </div>
           <span className={cn('text-xs font-bold', colors.text)}>{config?.label}</span>
         </div>
-        <button onClick={onClose} className="p-1 rounded hover:bg-slate-100 text-slate-400 cursor-pointer">
-          <XIcon className="w-4 h-4" />
+        <button onClick={onClose} className="p-0.5 rounded hover:bg-slate-100 text-slate-400 cursor-pointer">
+          <XIcon className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      <div className="p-4 space-y-4">
+      <div className="p-3 space-y-3">
         {node.type === 'WAIT' && <WaitEditor node={node} onUpdate={updateParams} />}
         {node.type === 'CONDITION' && <ConditionEditor node={node} onUpdate={updateParams} />}
         {node.type === 'ACTION_SEND_EMAIL' && <SendEmailEditor node={node} onUpdate={updateParams} />}
         {(node.type === 'ACTION_ADD_TAG' || node.type === 'ACTION_REMOVE_TAG') && <TagEditor node={node} onUpdate={updateParams} />}
         {node.type === 'ACTION_CHANGE_LIFECYCLE' && <LifecycleEditor node={node} onUpdate={updateParams} />}
         {node.type === 'END' && (
-          <p className="text-xs text-slate-400 italic">Este nó encerra a jornada do contato no fluxo.</p>
+          <p className="text-[10px] text-slate-400 italic">Este nó encerra a jornada do contato no fluxo.</p>
         )}
       </div>
     </div>
@@ -601,92 +685,368 @@ function LifecycleEditor({ node, onUpdate }: { node: CanvasNode; onUpdate: (id: 
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Add Node Palette (inline dropdown)
+   Trigger Properties Panel (when trigger/start card is selected)
    ═══════════════════════════════════════════════════════════════════════════ */
 
-function AddNodePalette({ onAdd, onClose }: { onAdd: (type: NodeType) => void; onClose: () => void }) {
-  const categories = [
-    { label: 'Ações', items: NODE_TYPES.filter((n) => n.category === 'action') },
-    { label: 'Fluxo', items: NODE_TYPES.filter((n) => n.category === 'flow') },
-    { label: 'Final', items: NODE_TYPES.filter((n) => n.category === 'end') },
-  ]
-
+function TriggerPropertiesPanel({ trigger, onUpdate, onClose }: {
+  trigger: TriggerConfig
+  onUpdate: (trigger: TriggerConfig) => void
+  onClose: () => void
+}) {
   return (
-    <div className="absolute z-50 top-full left-1/2 -translate-x-1/2 mt-2 bg-white rounded-xl border border-slate-200 shadow-xl p-3 w-72">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-bold text-slate-700">Adicionar Nó</span>
-        <button onClick={onClose} className="p-0.5 rounded hover:bg-slate-100 text-slate-400 cursor-pointer"><XIcon className="w-3.5 h-3.5" /></button>
+    <div className="w-72 shrink-0 border-l border-slate-200 bg-white overflow-y-auto">
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-100">
+        <div className="flex items-center gap-2">
+          <div className="w-5 h-5 rounded bg-violet-500 flex items-center justify-center">
+            <Zap className="w-3 h-3 text-white" />
+          </div>
+          <span className="text-xs font-bold text-violet-700">Entrada de Leads</span>
+        </div>
+        <button onClick={onClose} className="p-0.5 rounded hover:bg-slate-100 text-slate-400 cursor-pointer">
+          <XIcon className="w-3.5 h-3.5" />
+        </button>
       </div>
-      {categories.map((cat) => (
-        <div key={cat.label} className="mb-2">
-          <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">{cat.label}</div>
-          <div className="space-y-1">
-            {cat.items.map((item) => (
+
+      <div className="p-3 space-y-3">
+        <p className="text-[10px] text-slate-500">
+          Configure como os contatos entram neste fluxo de automação. Quando o gatilho é acionado, o contato inicia a jornada automaticamente.
+        </p>
+
+        <div>
+          <Label className="text-xs font-semibold">Tipo de Gatilho</Label>
+          <div className="mt-1.5 space-y-1">
+            {TRIGGER_TYPES.map((t) => (
               <button
-                key={item.value}
-                onClick={() => { onAdd(item.value); onClose() }}
-                className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-xs text-left hover:bg-slate-50 transition-colors cursor-pointer"
+                key={t.value}
+                onClick={() => onUpdate({ ...trigger, type: t.value })}
+                className={cn(
+                  'flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-left transition-all cursor-pointer text-[11px]',
+                  trigger.type === t.value
+                    ? 'bg-violet-100 border border-violet-300 text-violet-800 font-medium'
+                    : 'hover:bg-slate-50 border border-transparent text-slate-600',
+                )}
               >
-                <span className={cn('w-6 h-6 rounded flex items-center justify-center text-white text-[10px]', item.color)}>{item.icon}</span>
-                <div>
-                  <div className="font-medium text-slate-700">{item.label}</div>
-                  <div className="text-[10px] text-slate-400">{item.description}</div>
+                <span className="text-sm">{t.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium">{t.label}</div>
+                  <div className="text-[10px] text-slate-400 leading-tight">{t.description}</div>
                 </div>
               </button>
             ))}
           </div>
         </div>
-      ))}
+
+        {/* Conditional params */}
+        {(trigger.type === 'TAG_ADDED' || trigger.type === 'TAG_REMOVED') && (
+          <div>
+            <Label className="text-xs">Tag</Label>
+            <Input
+              value={trigger.params.tagId ?? ''}
+              onChange={(e) => onUpdate({ ...trigger, params: { ...trigger.params, tagId: e.target.value } })}
+              className="mt-1 h-7 text-xs" placeholder="nome-da-tag"
+            />
+          </div>
+        )}
+        {trigger.type === 'ENTERED_LIST' && (
+          <div>
+            <Label className="text-xs">Segmento</Label>
+            <Input
+              value={trigger.params.segmentId ?? ''}
+              onChange={(e) => onUpdate({ ...trigger, params: { ...trigger.params, segmentId: e.target.value } })}
+              className="mt-1 h-7 text-xs" placeholder="ID do segmento"
+            />
+          </div>
+        )}
+        {trigger.type === 'LIFECYCLE_CHANGED' && (
+          <div>
+            <Label className="text-xs">Novo Estágio</Label>
+            <select
+              value={trigger.params.newStage ?? ''}
+              onChange={(e) => onUpdate({ ...trigger, params: { ...trigger.params, newStage: e.target.value } })}
+              className="w-full mt-1 h-7 rounded-md border border-slate-200 bg-white px-2 text-xs focus:outline-none focus:ring-2 focus:ring-botica-500"
+            >
+              <option value="">Qualquer estágio</option>
+              {LIFECYCLE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+        )}
+        {(trigger.type === 'EVENT_OCCURRED' || trigger.type === 'PURCHASE_MADE' || trigger.type === 'CART_ABANDONED') && (
+          <div>
+            <Label className="text-xs">Tipo de Evento</Label>
+            <Input
+              value={trigger.params.eventType ?? ''}
+              onChange={(e) => onUpdate({ ...trigger, params: { ...trigger.params, eventType: e.target.value } })}
+              className="mt-1 h-7 text-xs" placeholder="ex: purchase, cart_abandoned"
+            />
+          </div>
+        )}
+
+        <div className="rounded-md bg-blue-50 border border-blue-200 p-2">
+          <p className="text-[10px] text-blue-700 leading-relaxed">
+            <strong>Como funciona:</strong> Quando o evento selecionado acontece no DynamoDB (criação de contato, mudança de tag, evento de compra, etc.),
+            o DynamoDB Stream detecta a mudança e a Lambda de trigger inicia automaticamente a execução deste fluxo para o contato.
+          </p>
+        </div>
+      </div>
     </div>
   )
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Canvas (Flow Editor)
+   Vertical Flow Renderer — walks the node graph and renders in order
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function FlowRenderer({
+  nodes, trigger, selectedNodeId, triggerSelected,
+  onSelectNode, onSelectTrigger, onRemoveNode, onAddAfter,
+}: {
+  nodes: CanvasNode[]
+  trigger: TriggerConfig
+  selectedNodeId: string | null
+  triggerSelected: boolean
+  onSelectNode: (id: string) => void
+  onSelectTrigger: () => void
+  onRemoveNode: (id: string) => void
+  onAddAfter: (afterId: string, type: NodeType, branch?: 'true' | 'false') => void
+}) {
+  // Walk the main flow: find start node (first non-END not referenced by others)
+  const referenced = new Set<string>()
+  for (const n of nodes) {
+    if (n.next) referenced.add(n.next)
+    if (n.branches?.truePath) referenced.add(n.branches.truePath)
+    if (n.branches?.falsePath) referenced.add(n.branches.falsePath)
+  }
+  const startNode = nodes
+    .filter((n) => !referenced.has(n.id))
+    .sort((a, b) => a.position.y - b.position.y)
+    .find((n) => n.type !== 'END')
+    ?? nodes.filter((n) => !referenced.has(n.id)).sort((a, b) => a.position.y - b.position.y)[0]
+    ?? nodes[0]
+
+  // Walk the flow
+  const renderChain = (nodeId: string | null, visited = new Set<string>()): React.ReactNode[] => {
+    if (!nodeId) return []
+    if (visited.has(nodeId)) return []
+    visited.add(nodeId)
+
+    const node = nodes.find((n) => n.id === nodeId)
+    if (!node) return []
+
+    const elements: React.ReactNode[] = []
+
+    elements.push(
+      <div key={node.id} className="flex flex-col items-center">
+        <CanvasNodeCard
+          node={node}
+          isSelected={selectedNodeId === node.id}
+          onSelect={() => onSelectNode(node.id)}
+          onRemove={() => onRemoveNode(node.id)}
+        />
+      </div>
+    )
+
+    if (node.type === 'CONDITION') {
+      // Branch rendering
+      const trueBranch = node.branches?.truePath
+      const falseBranch = node.branches?.falsePath
+
+      elements.push(
+        <div key={`${node.id}_branches`} className="flex gap-6 mt-0">
+          {/* YES branch */}
+          <div className="flex flex-col items-center">
+            <div className="flex flex-col items-center py-1">
+              <div className="w-px h-3 bg-emerald-400" />
+              <span className="text-[8px] font-bold text-white bg-emerald-500 px-1.5 py-0.5 rounded-full">SIM</span>
+              <div className="w-px h-3 bg-emerald-400" />
+            </div>
+            {!trueBranch && (
+              <InlineAddButton onAdd={(type) => onAddAfter(node.id, type, 'true')} />
+            )}
+            {trueBranch ? renderChain(trueBranch, visited) : (
+              <div className="text-[10px] text-slate-400 italic py-2">Sem caminho</div>
+            )}
+          </div>
+          {/* NO branch */}
+          <div className="flex flex-col items-center">
+            <div className="flex flex-col items-center py-1">
+              <div className="w-px h-3 bg-red-400" />
+              <span className="text-[8px] font-bold text-white bg-red-500 px-1.5 py-0.5 rounded-full">NÃO</span>
+              <div className="w-px h-3 bg-red-400" />
+            </div>
+            {!falseBranch && (
+              <InlineAddButton onAdd={(type) => onAddAfter(node.id, type, 'false')} />
+            )}
+            {falseBranch ? renderChain(falseBranch, visited) : (
+              <div className="text-[10px] text-slate-400 italic py-2">Sem caminho</div>
+            )}
+          </div>
+        </div>
+      )
+    } else if (node.type !== 'END') {
+      // Normal sequential: add button + next node
+      elements.push(
+        <InlineAddButton key={`${node.id}_add`} onAdd={(type) => onAddAfter(node.id, type)} />
+      )
+      if (node.next) {
+        elements.push(...renderChain(node.next, visited))
+      }
+    }
+    // END nodes: no more buttons or children — flow terminates here
+
+    return elements
+  }
+
+  return (
+    <div className="flex flex-col items-center py-6 px-4 min-w-[300px]">
+      {/* Trigger / Start Card */}
+      <TriggerStartCard
+        trigger={trigger}
+        isSelected={triggerSelected}
+        onSelect={onSelectTrigger}
+      />
+      {startNode && (
+        <>
+          <InlineAddButton onAdd={(type) => onAddAfter('__before_start__', type)} />
+          {renderChain(startNode.id)}
+        </>
+      )}
+      {!startNode && (
+        <div className="py-8 text-center">
+          <p className="text-xs text-slate-400">Adicione o primeiro passo do fluxo</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   JSON/ASL Editor Panel
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function JsonEditorPanel({
+  automation, getASLPreview, showToast,
+}: {
+  automation: Automation
+  getASLPreview: () => import('../lib/asl-generator').ASLDefinition | null
+  showToast: (m: string, t?: 'success' | 'error') => void
+}) {
+  const [jsonContent, setJsonContent] = useState('')
+  const [jsonError, setJsonError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const asl = getASLPreview()
+    if (asl) {
+      setJsonContent(JSON.stringify(asl, null, 2))
+      setJsonError(null)
+    }
+  }, [automation.nodes, automation.trigger, automation.name])
+
+  const handleValidateJson = () => {
+    try {
+      const parsed = JSON.parse(jsonContent)
+      if (!parsed.StartAt || !parsed.States) {
+        setJsonError('O JSON precisa ter "StartAt" e "States" (formato ASL)')
+        return
+      }
+      setJsonError(null)
+      showToast('JSON válido!')
+    } catch (e) {
+      setJsonError(`JSON inválido: ${e instanceof Error ? e.message : 'Erro de sintaxe'}`)
+    }
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-slate-200 bg-slate-50 shrink-0">
+        <div className="flex items-center gap-2">
+          <Code2 className="w-3.5 h-3.5 text-slate-500" />
+          <span className="text-xs font-bold text-slate-700">Amazon States Language (ASL)</span>
+        </div>
+        <div className="flex gap-1.5">
+          <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={handleValidateJson}>
+            <Check className="w-3 h-3" /> Validar
+          </Button>
+          <Button variant="outline" size="sm" className="h-6 text-[10px] px-2" onClick={() => {
+            navigator.clipboard.writeText(jsonContent)
+            showToast('JSON copiado!')
+          }}>
+            <Copy className="w-3 h-3" /> Copiar
+          </Button>
+        </div>
+      </div>
+      {jsonError && (
+        <div className="px-3 py-1.5 bg-red-50 border-b border-red-200 text-[10px] text-red-700 flex items-center gap-1">
+          <AlertCircle className="w-3 h-3 shrink-0" /> {jsonError}
+        </div>
+      )}
+      <textarea
+        value={jsonContent}
+        onChange={(e) => { setJsonContent(e.target.value); setJsonError(null) }}
+        className="flex-1 w-full p-3 bg-slate-900 text-green-400 text-xs font-mono resize-none focus:outline-none leading-relaxed"
+        spellCheck={false}
+      />
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Canvas (Flow Editor) — Redesigned Compact Vertical
    ═══════════════════════════════════════════════════════════════════════════ */
 
 function AutomationCanvas({ onBack, showToast }: { onBack: () => void; showToast: (m: string, t?: 'success' | 'error') => void }) {
   const {
     automation, selectedNodeId, isDirty, validationErrors,
-    setName, setTrigger, addNode, removeNode,
+    setName, setTrigger, addNode, prependNode, removeNode,
     selectNode, validate, exportPayload, loadAutomation,
     getASLPreview,
   } = useAutomationEditor()
 
   const createMutation = useCreateAutomation()
   const updateMutation = useUpdateAutomation()
-  const [addingAfterNodeId, setAddingAfterNodeId] = useState<string | null>(null)
-  const [showTriggerConfig, setShowTriggerConfig] = useState(false)
-  const [showJsonPreview, setShowJsonPreview] = useState(false)
-  const [jsonPayloadCache, setJsonPayloadCache] = useState<string>('')
+  const [editorMode, setEditorMode] = useState<'canvas' | 'json'>('canvas')
+  const [triggerSelected, setTriggerSelected] = useState(false)
   const canvasRef = useRef<HTMLDivElement>(null)
 
   const isSaving = createMutation.isPending || updateMutation.isPending
 
   const selectedNode = automation?.nodes.find((n) => n.id === selectedNodeId) ?? null
 
-  // Build connection lines
-  const connections = useMemo(() => {
-    if (!automation) return []
-    const lines: { from: CanvasNode; to: CanvasNode; label?: string }[] = []
-    for (const node of automation.nodes) {
-      if (node.next) {
-        const target = automation.nodes.find((n) => n.id === node.next)
-        if (target) lines.push({ from: node, to: target })
+  const handleSelectTrigger = useCallback(() => {
+    selectNode(null)
+    setTriggerSelected(true)
+  }, [selectNode])
+
+  const handleSelectNode = useCallback((id: string) => {
+    setTriggerSelected(false)
+    selectNode(id)
+  }, [selectNode])
+
+  const handleDeselectAll = useCallback(() => {
+    setTriggerSelected(false)
+    selectNode(null)
+  }, [selectNode])
+
+  const handleAddAfter = useCallback((afterId: string, type: NodeType, branch?: 'true' | 'false') => {
+    if (afterId === '__before_start__') {
+      // Check if the first node is an END — if so, smart-insert before it
+      const referenced = new Set<string>()
+      for (const n of automation!.nodes) {
+        if (n.next) referenced.add(n.next)
+        if (n.branches?.truePath) referenced.add(n.branches.truePath)
+        if (n.branches?.falsePath) referenced.add(n.branches.falsePath)
       }
-      if (node.branches) {
-        if (node.branches.truePath) {
-          const target = automation.nodes.find((n) => n.id === node.branches!.truePath)
-          if (target) lines.push({ from: node, to: target, label: 'SIM' })
-        }
-        if (node.branches.falsePath) {
-          const target = automation.nodes.find((n) => n.id === node.branches!.falsePath)
-          if (target) lines.push({ from: node, to: target, label: 'NÃO' })
-        }
+      const startNode = automation!.nodes.find(n => !referenced.has(n.id) && n.type !== 'END')
+      if (startNode) {
+        // Real nodes exist — prepend before them
+        prependNode(type)
+      } else {
+        // Only END node(s) — addNode will insert before END
+        addNode(type)
       }
+    } else {
+      addNode(type, afterId, branch)
     }
-    return lines
-  }, [automation])
+  }, [addNode, prependNode, automation])
 
   const handleSave = useCallback(async () => {
     const errors = validate()
@@ -711,231 +1071,144 @@ function AutomationCanvas({ onBack, showToast }: { onBack: () => void; showToast
     }
   }, [validate, exportPayload, automation, createMutation, updateMutation, loadAutomation, showToast])
 
-  const handleExportJson = useCallback(() => {
-    const asl = getASLPreview()
-    if (!asl) {
-      showToast('Não foi possível gerar o ASL — verifique o fluxo', 'error')
-      return
-    }
-    setJsonPayloadCache(JSON.stringify(asl, null, 2))
-    setShowJsonPreview(true)
-  }, [getASLPreview, showToast])
-
   if (!automation) return null
-
-  // Calculate SVG viewport
-  const allX = automation.nodes.map((n) => n.position.x)
-  const allY = automation.nodes.map((n) => n.position.y)
-  const svgWidth = Math.max(800, ...allX.map((x) => x + 400))
-  const svgHeight = Math.max(600, ...allY.map((y) => y + 200))
 
   return (
     <div className="flex flex-col h-full">
       {/* Canvas Toolbar */}
-      <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-slate-200 shrink-0">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={onBack}>
-            <XIcon className="w-3.5 h-3.5" /> Voltar
+      <div className="flex items-center justify-between px-3 py-1.5 bg-white border-b border-slate-200 shrink-0">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" className="h-7 px-2" onClick={onBack}>
+            <XIcon className="w-3 h-3" /> Voltar
           </Button>
-          <div className="h-5 w-px bg-slate-200" />
+          <div className="h-4 w-px bg-slate-200" />
           <Input
             value={automation.name}
             onChange={(e) => setName(e.target.value)}
-            className="h-8 w-64 text-sm font-semibold border-transparent hover:border-slate-200 focus:border-botica-500"
+            className="h-7 w-52 text-xs font-semibold border-transparent hover:border-slate-200 focus:border-botica-500"
           />
-          {isDirty && <span className="text-[10px] text-amber-600 font-medium">• Alterações não salvas</span>}
+          {isDirty && <span className="text-[9px] text-amber-600 font-medium">• Não salvo</span>}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          {/* Editor mode toggle */}
+          <div className="flex rounded-md border border-slate-200 overflow-hidden">
+            <button
+              onClick={() => setEditorMode('canvas')}
+              className={cn(
+                'px-2 py-1 text-[10px] font-medium transition-colors cursor-pointer',
+                editorMode === 'canvas' ? 'bg-botica-500 text-white' : 'bg-white text-slate-500 hover:bg-slate-50',
+              )}
+            >
+              <MousePointerClick className="w-3 h-3 inline mr-0.5" /> Canvas
+            </button>
+            <button
+              onClick={() => setEditorMode('json')}
+              className={cn(
+                'px-2 py-1 text-[10px] font-medium transition-colors cursor-pointer',
+                editorMode === 'json' ? 'bg-botica-500 text-white' : 'bg-white text-slate-500 hover:bg-slate-50',
+              )}
+            >
+              <Code2 className="w-3 h-3 inline mr-0.5" /> JSON
+            </button>
+          </div>
+
+          <div className="h-4 w-px bg-slate-200" />
+
           {validationErrors.length > 0 && (
-            <span className="text-[10px] text-red-600 flex items-center gap-1">
-              <AlertTriangle className="w-3 h-3" /> {validationErrors.length} erro(s)
+            <span className="text-[10px] text-red-600 flex items-center gap-0.5">
+              <AlertTriangle className="w-3 h-3" /> {validationErrors.length}
             </span>
           )}
-          <Button variant="outline" size="sm" onClick={() => validate()}>
-            <Check className="w-3.5 h-3.5" /> Validar
+          <Button variant="outline" size="sm" className="h-7 text-[10px] px-2" onClick={() => validate()}>
+            <Check className="w-3 h-3" /> Validar
           </Button>
-          <Button variant="outline" size="sm" onClick={handleExportJson}>
-            <Eye className="w-3.5 h-3.5" /> ASL
-          </Button>
-          <Button size="sm" onClick={handleSave} disabled={isSaving}>
-            {isSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+          <Button size="sm" className="h-7 text-[10px] px-2" onClick={handleSave} disabled={isSaving}>
+            {isSaving ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
             Salvar
           </Button>
         </div>
       </div>
 
-      {/* Main content: Sidebar + Canvas + Properties */}
+      {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left sidebar: Trigger + Node palette */}
-        <div className="w-60 shrink-0 border-r border-slate-200 bg-slate-50/50 overflow-y-auto">
-          <div className="p-3 space-y-4">
-            {/* Trigger section */}
-            <section>
-              <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Gatilho de Entrada</h3>
-              <button
-                onClick={() => setShowTriggerConfig(!showTriggerConfig)}
-                className="w-full rounded-lg border-2 border-dashed border-violet-300 bg-violet-50 p-3 text-left hover:border-violet-400 transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-violet-600" />
-                  <div>
-                    <div className="text-xs font-bold text-violet-700">
-                      {TRIGGER_TYPES.find((t) => t.value === automation.trigger.type)?.label ?? 'Selecionar...'}
-                    </div>
-                    {automation.trigger.params.tagId && (
-                      <div className="text-[10px] text-violet-500 mt-0.5">Tag: {automation.trigger.params.tagId}</div>
-                    )}
+        {editorMode === 'canvas' ? (
+          <>
+            {/* Left: Component palette (slimmer) */}
+            <div className="w-48 shrink-0 border-r border-slate-200 bg-slate-50/50 overflow-y-auto">
+              <div className="p-2 space-y-3">
+                <section>
+                  <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 px-1">Componentes</h3>
+                  <div className="space-y-0.5">
+                    {NODE_TYPES.filter(nt => nt.category !== 'end').map((nt) => (
+                      <button
+                        key={nt.value}
+                        onClick={() => addNode(nt.value)}
+                        className="flex items-center gap-1.5 w-full px-1.5 py-1 rounded text-[11px] hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 transition-all cursor-pointer"
+                      >
+                        <span className={cn('w-5 h-5 rounded flex items-center justify-center text-white text-[9px]', nt.color)}>{nt.icon}</span>
+                        <span className="text-slate-600 font-medium">{nt.label}</span>
+                      </button>
+                    ))}
                   </div>
-                </div>
-              </button>
+                </section>
 
-              {showTriggerConfig && (
-                <div className="mt-2 p-3 rounded-lg bg-white border border-slate-200 space-y-2">
-                  <Label className="text-xs">Tipo de Gatilho</Label>
-                  <select
-                    value={automation.trigger.type}
-                    onChange={(e) => setTrigger({ ...automation.trigger, type: e.target.value as TriggerConfig['type'] })}
-                    className="w-full h-8 rounded-md border border-slate-200 bg-white px-2 text-xs focus:outline-none focus:ring-2 focus:ring-botica-500"
-                  >
-                    {TRIGGER_TYPES.map((t) => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
-                  </select>
-                  {(automation.trigger.type === 'TAG_ADDED' || automation.trigger.type === 'TAG_REMOVED') && (
-                    <div>
-                      <Label className="text-xs">Tag</Label>
-                      <Input
-                        value={automation.trigger.params.tagId ?? ''}
-                        onChange={(e) => setTrigger({ ...automation.trigger, params: { ...automation.trigger.params, tagId: e.target.value } })}
-                        className="mt-1 h-8 text-xs" placeholder="nome-da-tag"
-                      />
+                {validationErrors.length > 0 && (
+                  <section>
+                    <h3 className="text-[9px] font-bold text-red-500 uppercase tracking-wider mb-1.5 px-1">Erros</h3>
+                    <div className="space-y-0.5">
+                      {validationErrors.map((err, i) => (
+                        <div
+                          key={i}
+                          onClick={() => err.nodeId && handleSelectNode(err.nodeId)}
+                          className={cn('text-[9px] text-red-600 bg-red-50 rounded p-1.5 border border-red-100 leading-tight', err.nodeId && 'cursor-pointer hover:bg-red-100')}
+                        >
+                          {err.message}
+                        </div>
+                      ))}
                     </div>
-                  )}
-                  {automation.trigger.type === 'ENTERED_LIST' && (
-                    <div>
-                      <Label className="text-xs">Segmento</Label>
-                      <Input
-                        value={automation.trigger.params.segmentId ?? ''}
-                        onChange={(e) => setTrigger({ ...automation.trigger, params: { ...automation.trigger.params, segmentId: e.target.value } })}
-                        className="mt-1 h-8 text-xs" placeholder="ID do segmento"
-                      />
-                    </div>
-                  )}
-                  {automation.trigger.type === 'EVENT_OCCURRED' && (
-                    <div>
-                      <Label className="text-xs">Tipo de Evento</Label>
-                      <Input
-                        value={automation.trigger.params.eventType ?? ''}
-                        onChange={(e) => setTrigger({ ...automation.trigger, params: { ...automation.trigger.params, eventType: e.target.value } })}
-                        className="mt-1 h-8 text-xs" placeholder="cart_abandoned"
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-            </section>
-
-            {/* Node palette */}
-            <section>
-              <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Componentes</h3>
-              <div className="space-y-1">
-                {NODE_TYPES.map((nt) => (
-                  <button
-                    key={nt.value}
-                    onClick={() => addNode(nt.value)}
-                    className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-xs hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 transition-all cursor-pointer"
-                  >
-                    <span className={cn('w-6 h-6 rounded flex items-center justify-center text-white text-[10px]', nt.color)}>{nt.icon}</span>
-                    <span className="text-slate-600 font-medium">{nt.label}</span>
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            {/* Validation errors */}
-            {validationErrors.length > 0 && (
-              <section>
-                <h3 className="text-[10px] font-bold text-red-500 uppercase tracking-wider mb-2">Erros de Validação</h3>
-                <div className="space-y-1">
-                  {validationErrors.map((err, i) => (
-                    <div
-                      key={i}
-                      onClick={() => err.nodeId && selectNode(err.nodeId)}
-                      className={cn('text-[10px] text-red-600 bg-red-50 rounded p-2 border border-red-100', err.nodeId && 'cursor-pointer hover:bg-red-100')}
-                    >
-                      {err.message}
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-          </div>
-        </div>
-
-        {/* Center: Canvas */}
-        <div className="flex-1 overflow-auto bg-[radial-gradient(circle,#e2e8f0_1px,transparent_1px)] bg-[length:20px_20px] relative" ref={canvasRef} onClick={() => selectNode(null)}>
-          <svg className="absolute inset-0 pointer-events-none" width={svgWidth} height={svgHeight}>
-            {connections.map((conn, i) => (
-              <ConnectionLine
-                key={i}
-                from={{ x: conn.from.position.x + 128, y: conn.from.position.y + 60 }}
-                to={{ x: conn.to.position.x + 128, y: conn.to.position.y }}
-                label={conn.label}
-              />
-            ))}
-          </svg>
-          <div className="relative" style={{ minWidth: svgWidth, minHeight: svgHeight }}>
-            {automation.nodes.map((node) => (
-              <div
-                key={node.id}
-                className="absolute"
-                style={{ left: node.position.x, top: node.position.y }}
-              >
-                <CanvasNodeCard
-                  node={node}
-                  isSelected={selectedNodeId === node.id}
-                  onSelect={() => selectNode(node.id)}
-                  onAddAfter={() => setAddingAfterNodeId(addingAfterNodeId === node.id ? null : node.id)}
-                  onRemove={() => removeNode(node.id)}
-                />
-                {addingAfterNodeId === node.id && (
-                  <AddNodePalette
-                    onAdd={(type) => { addNode(type, node.id); setAddingAfterNodeId(null) }}
-                    onClose={() => setAddingAfterNodeId(null)}
-                  />
+                  </section>
                 )}
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
 
-        {/* Right: Properties panel */}
-        {selectedNode && (
-          <NodePropertiesPanel node={selectedNode} onClose={() => selectNode(null)} />
+            {/* Center: Vertical flow canvas */}
+            <div
+              className="flex-1 overflow-auto bg-[radial-gradient(circle,#e2e8f0_1px,transparent_1px)] bg-[length:20px_20px]"
+              ref={canvasRef}
+              onClick={handleDeselectAll}
+            >
+              <FlowRenderer
+                nodes={automation.nodes}
+                trigger={automation.trigger}
+                selectedNodeId={selectedNodeId}
+                triggerSelected={triggerSelected}
+                onSelectNode={handleSelectNode}
+                onSelectTrigger={handleSelectTrigger}
+                onRemoveNode={removeNode}
+                onAddAfter={handleAddAfter}
+              />
+            </div>
+
+            {/* Right: Properties panel */}
+            {triggerSelected && (
+              <TriggerPropertiesPanel
+                trigger={automation.trigger}
+                onUpdate={setTrigger}
+                onClose={handleDeselectAll}
+              />
+            )}
+            {selectedNode && !triggerSelected && (
+              <NodePropertiesPanel node={selectedNode} onClose={handleDeselectAll} />
+            )}
+          </>
+        ) : (
+          <JsonEditorPanel
+            automation={automation}
+            getASLPreview={getASLPreview}
+            showToast={showToast}
+          />
         )}
       </div>
-
-      {/* JSON Preview Dialog */}
-      <Dialog open={showJsonPreview} onOpenChange={setShowJsonPreview}>
-        <DialogContent onClose={() => setShowJsonPreview(false)} className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Amazon States Language (ASL)</DialogTitle>
-            <DialogDescription>Definição da máquina de estado que será criada no AWS Step Functions.</DialogDescription>
-          </DialogHeader>
-          <pre className="bg-slate-900 text-green-400 rounded-lg p-4 text-xs max-h-[60vh] overflow-auto font-mono">
-            {jsonPayloadCache}
-          </pre>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowJsonPreview(false)}>Fechar</Button>
-            <Button onClick={() => {
-              if (jsonPayloadCache) {
-                navigator.clipboard.writeText(jsonPayloadCache)
-                showToast('JSON copiado para a área de transferência!')
-              }
-            }}>
-              <Copy className="w-3.5 h-3.5" /> Copiar JSON
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

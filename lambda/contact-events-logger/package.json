@@ -1,0 +1,6 @@
+{
+  "name": "contact-events-logger",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "DynamoDB Stream → Contact Event Logger (creates EVENT# audit records for contact METADATA changes)"
+}

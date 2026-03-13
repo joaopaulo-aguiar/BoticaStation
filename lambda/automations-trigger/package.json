@@ -1,0 +1,7 @@
+{
+  "name": "automations-trigger",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "DynamoDB Stream → Automation Trigger (starts Step Functions executions based on contact changes)"
+}

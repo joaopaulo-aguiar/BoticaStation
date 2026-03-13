@@ -48,7 +48,8 @@ interface AutomationEditorState {
   setTrigger: (trigger: TriggerConfig) => void
 
   // Node operations
-  addNode: (type: NodeType, afterNodeId?: string | null) => string
+  addNode: (type: NodeType, afterNodeId?: string | null, branch?: 'true' | 'false') => string
+  prependNode: (type: NodeType) => string
   updateNodeParams: (nodeId: string, params: NodeParams) => void
   removeNode: (nodeId: string) => void
   connectNodes: (fromId: string, toId: string, branch?: 'true' | 'false') => void
@@ -120,7 +121,7 @@ export const useAutomationEditor = create<AutomationEditorState>((set, get) => (
     set({ automation: { ...automation, trigger }, isDirty: true })
   },
 
-  addNode: (type, afterNodeId) => {
+  addNode: (type, afterNodeId, branch) => {
     const { automation } = get()
     if (!automation) return ''
 
@@ -137,34 +138,123 @@ export const useAutomationEditor = create<AutomationEditorState>((set, get) => (
       ...(type === 'CONDITION' ? { branches: { truePath: null, falsePath: null } } : {}),
     }
 
-    // If adding after a specific node, rewire connections
     if (afterNodeId) {
       const afterNode = nodes.find((n) => n.id === afterNodeId)
       if (afterNode) {
-        // New node takes the "next" of the after node
-        if (type !== 'CONDITION') {
-          newNode.next = afterNode.next
-        }
-        // After node now points to new node
-        if (afterNode.type === 'CONDITION') {
-          // Don't auto-wire conditions
-        } else {
-          afterNode.next = newId
-        }
-        // Position new node below the after node
-        newNode.position = {
-          x: afterNode.position.x,
-          y: afterNode.position.y + NODE_HEIGHT + NODE_GAP,
-        }
-        // Shift all nodes below down
-        const threshold = newNode.position.y - NODE_GAP / 2
-        nodes.forEach((n) => {
-          if (n.id !== afterNodeId && n.id !== newId && n.position.y >= threshold) {
-            n.position = { ...n.position, y: n.position.y + NODE_HEIGHT + NODE_GAP }
+        // If adding to a specific branch of a CONDITION node
+        if (branch && afterNode.type === 'CONDITION' && afterNode.branches) {
+          const branchKey = branch === 'true' ? 'truePath' : 'falsePath'
+          if (type !== 'CONDITION') {
+            newNode.next = afterNode.branches[branchKey]
           }
-        })
+          afterNode.branches = { ...afterNode.branches, [branchKey]: newId }
+          newNode.position = {
+            x: afterNode.position.x + (branch === 'true' ? -120 : 120),
+            y: afterNode.position.y + NODE_HEIGHT + NODE_GAP,
+          }
+        } else if (afterNode.type !== 'CONDITION') {
+          // Normal insertion after a sequential node
+          if (type !== 'CONDITION') {
+            newNode.next = afterNode.next
+          }
+          afterNode.next = newId
+          newNode.position = {
+            x: afterNode.position.x,
+            y: afterNode.position.y + NODE_HEIGHT + NODE_GAP,
+          }
+          // Shift all nodes below down
+          const threshold = newNode.position.y - NODE_GAP / 2
+          nodes.forEach((n) => {
+            if (n.id !== afterNodeId && n.id !== newId && n.position.y >= threshold) {
+              n.position = { ...n.position, y: n.position.y + NODE_HEIGHT + NODE_GAP }
+            }
+          })
+        }
+      }
+    } else {
+      // No afterNodeId: smart insert at end of chain (before END)
+      const referenced = new Set<string>()
+      for (const n of nodes) {
+        if (n.next) referenced.add(n.next)
+        if (n.branches?.truePath) referenced.add(n.branches.truePath)
+        if (n.branches?.falsePath) referenced.add(n.branches.falsePath)
+      }
+      const startNode = nodes.find(n => !referenced.has(n.id) && n.type !== 'END')
+        ?? nodes.find(n => !referenced.has(n.id))
+
+      if (startNode) {
+        if (startNode.type === 'END') {
+          // Only END node exists — insert before it
+          if (type !== 'CONDITION') {
+            newNode.next = startNode.id
+          }
+          newNode.position = { x: startNode.position.x, y: startNode.position.y }
+          startNode.position = { ...startNode.position, y: startNode.position.y + NODE_HEIGHT + NODE_GAP }
+        } else {
+          // Walk chain to find last non-END node
+          let last = startNode
+          const visited = new Set<string>()
+          while (last.next && !visited.has(last.id)) {
+            visited.add(last.id)
+            const nextNode = nodes.find(n => n.id === last.next)
+            if (!nextNode || nextNode.type === 'END') break
+            last = nextNode
+          }
+          // Insert after `last`
+          if (type !== 'CONDITION') {
+            newNode.next = last.next
+          }
+          if (last.type !== 'CONDITION') {
+            last.next = newId
+          }
+          newNode.position = {
+            x: last.position.x,
+            y: last.position.y + NODE_HEIGHT + NODE_GAP,
+          }
+          const threshold = newNode.position.y - NODE_GAP / 2
+          nodes.forEach(n => {
+            if (n.id !== last.id && n.id !== newId && n.position.y >= threshold) {
+              n.position = { ...n.position, y: n.position.y + NODE_HEIGHT + NODE_GAP }
+            }
+          })
+        }
       }
     }
+
+    nodes.push(newNode)
+    set({ automation: { ...automation, nodes }, isDirty: true, selectedNodeId: newId })
+    return newId
+  },
+
+  prependNode: (type) => {
+    const { automation } = get()
+    if (!automation) return ''
+
+    const newId = `node_${uuid().slice(0, 8)}`
+    const nodes = [...automation.nodes]
+
+    // Find chain start (node not referenced by any other)
+    const referenced = new Set<string>()
+    for (const n of nodes) {
+      if (n.next) referenced.add(n.next)
+      if (n.branches?.truePath) referenced.add(n.branches.truePath)
+      if (n.branches?.falsePath) referenced.add(n.branches.falsePath)
+    }
+    const startNode = nodes.find(n => !referenced.has(n.id))
+
+    const newNode: CanvasNode = {
+      id: newId,
+      type,
+      params: defaultParams(type),
+      next: type !== 'CONDITION' ? (startNode?.id ?? null) : null,
+      position: { x: 300, y: startNode ? startNode.position.y : 80 },
+      ...(type === 'CONDITION' ? { branches: { truePath: startNode?.id ?? null, falsePath: null } } : {}),
+    }
+
+    // Shift all existing nodes down
+    nodes.forEach(n => {
+      n.position = { ...n.position, y: n.position.y + NODE_HEIGHT + NODE_GAP }
+    })
 
     nodes.push(newNode)
     set({ automation: { ...automation, nodes }, isDirty: true, selectedNodeId: newId })

@@ -7,6 +7,7 @@ import { AutomationsPage } from '@/features/automations'
 import { CampaignsPage } from '@/features/campaigns/ui/campaigns-page'
 import { TransactionalPage } from '@/features/transactional/ui/transactional-page'
 import { CashbackPage } from '@/features/cashback/ui/cashback-page'
+import { CouponsPage } from '@/features/coupons/ui/coupons-page'
 import { ReportsPage } from '@/features/reports/ui/reports-page'
 import { SettingsPage } from '@/features/settings/ui/settings-page'
 import { TemplatesPage } from '@/features/templates'
@@ -31,6 +32,7 @@ export function App() {
             <Route path="/campaigns" element={<CampaignsPage />} />
             <Route path="/transactional" element={<TransactionalPage />} />
             <Route path="/cashback" element={<CashbackPage />} />
+            <Route path="/coupons" element={<CouponsPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
