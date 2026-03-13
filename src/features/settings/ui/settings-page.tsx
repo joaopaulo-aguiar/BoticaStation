@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import {
   Settings, Mail, Plus, Trash2, RefreshCw, CheckCircle2, XCircle, Clock,
   AlertCircle, Check, Globe, Send, Server, Users, Shield, Key, UserPlus,
-  ToggleLeft, ToggleRight, Search, Layers, CalendarClock, Save,
+  ToggleLeft, ToggleRight, Search, Layers, CalendarClock, Save, Link2,
 } from 'lucide-react'
 import { Button } from '@/shared/ui/button'
 import { Input } from '@/shared/ui/input'
@@ -56,7 +56,7 @@ const cognitoStatusLabel: Record<string, string> = {
 }
 
 type SesTab = 'identities' | 'senders' | 'infra'
-type MainTab = 'ses' | 'users' | 'scheduling'
+type MainTab = 'ses' | 'users' | 'scheduling' | 'utm'
 
 // ── Main Component ───────────────────────────────────────────────────────────
 
@@ -121,6 +121,18 @@ export function SettingsPage() {
           <CalendarClock className="w-4 h-4" />
           Agendamentos
         </button>
+        <button
+          className={cn(
+            'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors',
+            mainTab === 'utm'
+              ? 'border-botica-600 text-botica-700'
+              : 'border-transparent text-slate-500 hover:text-slate-700',
+          )}
+          onClick={() => setMainTab('utm')}
+        >
+          <Link2 className="w-4 h-4" />
+          UTM
+        </button>
       </div>
 
       {mainTab === 'ses' && (
@@ -157,6 +169,8 @@ export function SettingsPage() {
       {mainTab === 'users' && <UsersTab showToast={showToast} />}
 
       {mainTab === 'scheduling' && <SchedulingTab showToast={showToast} />}
+
+      {mainTab === 'utm' && <UtmDefaultsTab showToast={showToast} />}
 
       {/* Toast */}
       {toast && (
@@ -1158,6 +1172,104 @@ function UsersTab({ showToast }: { showToast: (m: string, t?: 'success' | 'error
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+// ── UTM Defaults Tab ─────────────────────────────────────────────────────────
+
+function UtmDefaultsTab({ showToast }: { showToast: (msg: string, type?: 'success' | 'error') => void }) {
+  const { data: settings, isLoading } = useCampaignSettingsFromSettings()
+  const updateSettings = useUpdateCampaignSettings()
+
+  const [utmSource, setUtmSource] = useState('')
+  const [utmMedium, setUtmMedium] = useState('')
+  const [dirty, setDirty] = useState(false)
+
+  if (settings && !dirty && utmSource === '' && utmMedium === '') {
+    setUtmSource(settings.defaultUtmSource ?? '')
+    setUtmMedium(settings.defaultUtmMedium ?? 'email')
+  }
+
+  const handleSave = useCallback(async () => {
+    try {
+      await updateSettings.mutateAsync({
+        timezone: settings?.timezone || 'America/Sao_Paulo',
+        scheduleGroupName: settings?.scheduleGroupName || 'marketing-campaigns',
+        defaultUtmSource: utmSource || null,
+        defaultUtmMedium: utmMedium || null,
+      })
+      setDirty(false)
+      showToast('Configurações UTM salvas')
+    } catch {
+      showToast('Erro ao salvar configurações UTM', 'error')
+    }
+  }, [utmSource, utmMedium, updateSettings, settings, showToast])
+
+  const markDirty = <T,>(setter: (v: T) => void) => (v: T) => {
+    setter(v)
+    setDirty(true)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="p-12 text-center text-sm text-slate-400">
+        <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2" />
+        Carregando...
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white rounded-lg border border-slate-200 shadow-sm">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <Link2 className="w-5 h-5 text-botica-600" />
+            <div>
+              <h2 className="text-sm font-semibold text-slate-700">Parâmetros UTM Padrão</h2>
+              <p className="text-xs text-slate-500">Valores pré-preenchidos ao criar novas campanhas</p>
+            </div>
+          </div>
+          <Button size="sm" onClick={handleSave} disabled={!dirty || updateSettings.isPending}>
+            <Save className="w-3.5 h-3.5 mr-1" />
+            {updateSettings.isPending ? 'Salvando...' : 'Salvar'}
+          </Button>
+        </div>
+        <div className="p-6 space-y-5">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="utm-source-default">utm_source Padrão</Label>
+              <Input
+                id="utm-source-default"
+                value={utmSource}
+                onChange={(e) => markDirty(setUtmSource)(e.target.value)}
+                placeholder="botica"
+                className="mt-1"
+              />
+              <p className="text-xs text-slate-400 mt-1">
+                Identifica a origem do tráfego (ex: botica, newsletter, parceiro)
+              </p>
+            </div>
+            <div>
+              <Label htmlFor="utm-medium-default">utm_medium Padrão</Label>
+              <Input
+                id="utm-medium-default"
+                value={utmMedium}
+                onChange={(e) => markDirty(setUtmMedium)(e.target.value)}
+                placeholder="email"
+                className="mt-1"
+              />
+              <p className="text-xs text-slate-400 mt-1">
+                Identifica o canal de marketing (ex: email, sms, social)
+              </p>
+            </div>
+          </div>
+          <p className="text-xs text-slate-400">
+            Estes valores serão pré-preenchidos ao criar novas campanhas. Podem ser personalizados individualmente em cada campanha.
+          </p>
+        </div>
+      </div>
     </div>
   )
 }

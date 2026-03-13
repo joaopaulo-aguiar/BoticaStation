@@ -55,7 +55,12 @@ function FormatDateBold({ iso }: { iso: string | null }) {
   const d = new Date(iso)
   const date = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
   const time = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-  return <span>{date} - <strong>{time}</strong></span>
+  return (
+    <span className="flex flex-col leading-tight">
+      <span>{date}</span>
+      <span className="font-bold text-[10px]">{time}</span>
+    </span>
+  )
 }
 
 function getStatusConfig(status: CampaignStatus) {
@@ -1426,12 +1431,7 @@ function CampaignListView({ showToast }: { showToast: (msg: string, type?: 'succ
   )
 }
 
-// ── Main Page (Default: Campaign List + Tabs: E-mails | Tags | UTM) ─────────
-
-type CampaignsTab = 'list' | 'emails' | 'utm'
-
 export function CampaignsPage() {
-  const [tab, setTab] = useState<CampaignsTab>('list')
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
   const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
@@ -1439,68 +1439,9 @@ export function CampaignsPage() {
     setTimeout(() => setToast(null), 4000)
   }, [])
 
-  const tabs: { key: CampaignsTab; label: string; icon: typeof Mail }[] = [
-    { key: 'emails', label: 'E-mails', icon: Mail },
-    { key: 'utm', label: 'UTM', icon: Link2 },
-  ]
-
   return (
-    <div className={cn('flex flex-col', (tab === 'emails' || tab === 'utm') ? 'h-[calc(100vh-4rem-2.25rem)] -m-4 lg:-m-6' : 'space-y-4')}>
-      {/* Tabs — always visible */}
-      <div className={cn(
-        'flex items-center gap-1 border-b border-slate-200 pb-px shrink-0',
-        (tab === 'emails' || tab === 'utm') ? 'px-4 lg:px-6 pt-4 lg:pt-6' : '-mt-1',
-      )}>
-        {/* "Campanhas" title acts as home/list button */}
-        <button
-          onClick={() => setTab('list')}
-          className={cn(
-            'flex items-center gap-1.5 px-4 py-2 text-sm font-semibold border-b-2 transition-colors cursor-pointer',
-            tab === 'list'
-              ? 'border-botica-600 text-botica-700'
-              : 'border-transparent text-slate-500 hover:text-slate-700',
-          )}
-        >
-          <Megaphone className="w-4 h-4" />
-          Campanhas
-        </button>
-        <div className="w-px h-5 bg-slate-200 mx-1" />
-        {tabs.map((t) => {
-          const Icon = t.icon
-          return (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={cn(
-                'flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors cursor-pointer',
-                tab === t.key
-                  ? 'border-botica-600 text-botica-700'
-                  : 'border-transparent text-slate-500 hover:text-slate-700',
-              )}
-            >
-              <Icon className="w-4 h-4" />
-              {t.label}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Content */}
-      {tab === 'list' && (
-        <div>
-          <CampaignListView showToast={showToast} />
-        </div>
-      )}
-      {tab === 'emails' && (
-        <div className="flex-1 overflow-hidden">
-          <TemplatesPage embedded />
-        </div>
-      )}
-      {tab === 'utm' && (
-        <div className="flex-1 overflow-auto px-4 lg:px-6 py-4">
-          <UtmDefaultsTab showToast={showToast} />
-        </div>
-      )}
+    <div className="space-y-4">
+      <CampaignListView showToast={showToast} />
 
       {/* Toast */}
       {toast && (

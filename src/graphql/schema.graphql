@@ -1,4 +1,4 @@
-# BoticaStation v0.43 — AppSync GraphQL Schema
+# BoticaStation v0.44 — AppSync GraphQL Schema
 # Region: sa-east-1 | API ID: hs5qzjtrwrgctclh2rv7yp76lq
 # Auth: Cognito User Pool (sa-east-1_0ySBjVR2a)
 
@@ -399,6 +399,87 @@ input UpdateUserInput {
 	enabled: Boolean
 }
 
+# ── Automações (Step Functions) ───────────────────────────────────────────────
+# Tabela: Config_Table | Data Source: AutomationsManagerLambda
+# PK = AUTOMATION, SK = AUTOMATION#{automationId}
+# State machines tagged { BoticaStation: Automations }
+
+type Automation {
+	id: ID!
+	name: String!
+	description: String
+	status: String!
+	trigger: AWSJSON!
+	nodes: AWSJSON!
+	aslDefinition: AWSJSON
+	stateMachineArn: String
+	sfnStatus: String
+	runningExecutions: Int
+	executionCount: Int!
+	createdAt: AWSDateTime!
+	updatedAt: AWSDateTime
+	createdBy: String
+}
+
+input CreateAutomationInput {
+	name: String!
+	description: String
+	trigger: AWSJSON!
+	nodes: AWSJSON!
+}
+
+input UpdateAutomationInput {
+	name: String
+	description: String
+	trigger: AWSJSON
+	nodes: AWSJSON
+}
+
+# ── Execuções (Step Functions) ────────────────────────────────────────────────
+
+type AutomationExecution {
+	executionArn: String!
+	name: String
+	status: String!
+	startDate: AWSDateTime
+	stopDate: AWSDateTime
+	automationId: String
+	automationName: String
+	contactId: String
+	contactEmail: String
+}
+
+type ExecutionDetail {
+	executionArn: String!
+	stateMachineArn: String
+	name: String
+	status: String!
+	startDate: AWSDateTime
+	stopDate: AWSDateTime
+	input: AWSJSON
+	output: AWSJSON
+	contactId: String
+	contactEmail: String
+	automationId: String
+	automationName: String
+}
+
+type ExecutionEvent {
+	id: Int!
+	type: String!
+	timestamp: AWSDateTime
+	previousEventId: Int
+	detail: AWSJSON
+}
+
+type StartExecutionResult {
+	executionArn: String!
+	startDate: AWSDateTime!
+	status: String!
+	automationId: String!
+	contactId: String!
+}
+
 # ── Queries ───────────────────────────────────────────────────────────────────
 
 type Query {
@@ -432,6 +513,13 @@ type Query {
 	# Cognito
 	listUsers: [CognitoUser!]!
 	listGroups: [CognitoGroup!]!
+	# Automations
+	listAutomations: [Automation!]!
+	getAutomation(id: ID!): Automation
+	# Automation Executions
+	listExecutions(automationId: ID!, status: String, maxResults: Int): [AutomationExecution!]!
+	describeExecution(executionArn: String!): ExecutionDetail
+	getExecutionHistory(executionArn: String!, maxResults: Int): [ExecutionEvent!]!
 }
 
 # ── Mutations ─────────────────────────────────────────────────────────────────
@@ -477,4 +565,13 @@ type Mutation {
 	addUserToGroup(username: String!, group: String!): Boolean!
 	removeUserFromGroup(username: String!, group: String!): Boolean!
 	resetUserPassword(username: String!): Boolean!
+	# Automations
+	createAutomation(input: CreateAutomationInput!): Automation!
+	updateAutomation(id: ID!, input: UpdateAutomationInput!): Automation!
+	deleteAutomation(id: ID!): Boolean!
+	updateAutomationStatus(id: ID!, status: String!): Automation!
+	duplicateAutomation(id: ID!): Automation!
+	# Automation Executions
+	startExecution(automationId: ID!, contactId: ID!, input: AWSJSON): StartExecutionResult!
+	stopExecution(executionArn: String!): Boolean!
 }

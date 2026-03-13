@@ -248,7 +248,7 @@ export function ContactDetailDialog({ contact, open, onClose }: ContactDetailDia
               {/* Cashback */}
               <section className="rounded-lg border border-slate-200 bg-white p-3">
                 <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Wallet className="w-3.5 h-3.5" /> Cashback
+                  <Wallet className="w-3.5 h-3.5" /> Saldo de Cashback
                 </h3>
                 <div className="text-lg font-bold text-botica-700">
                   R$ {cashback.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -263,21 +263,8 @@ export function ContactDetailDialog({ contact, open, onClose }: ContactDetailDia
                 )}
               </section>
 
-              {/* Tags */}
-              <section>
-                <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <Tag className="w-3.5 h-3.5" /> Tags
-                </h3>
-                {contact.tags.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {contact.tags.map((tag) => (
-                      <Badge key={tag} className="text-[11px] bg-botica-50 text-botica-700 border border-botica-200">{tag}</Badge>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-400 italic">Nenhuma tag</p>
-                )}
-              </section>
+              {/* Ecommerce Activity */}
+              <EcommerceSection ecommerce={contact.ecommerceInfo} />
 
               {/* Data Protection */}
               <section className="rounded-lg border border-slate-200 bg-white p-3">
@@ -297,9 +284,6 @@ export function ContactDetailDialog({ contact, open, onClose }: ContactDetailDia
                   </div>
                 </div>
               </section>
-
-              {/* Ecommerce Activity */}
-              <EcommerceSection ecommerce={contact.ecommerceInfo} />
 
               {/* Channel Health */}
               <section className="rounded-lg border border-slate-200 bg-white p-3">

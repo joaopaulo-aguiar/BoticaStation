@@ -9,6 +9,7 @@ import { TransactionalPage } from '@/features/transactional/ui/transactional-pag
 import { CashbackPage } from '@/features/cashback/ui/cashback-page'
 import { ReportsPage } from '@/features/reports/ui/reports-page'
 import { SettingsPage } from '@/features/settings/ui/settings-page'
+import { TemplatesPage } from '@/features/templates'
 import { AppLayout } from '@/shared/layout/app-layout'
 
 const queryClient = new QueryClient({
@@ -25,6 +26,7 @@ export function App() {
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/contacts" element={<ContactsPage />} />
+            <Route path="/emails" element={<TemplatesPage />} />
             <Route path="/automations" element={<AutomationsPage />} />
             <Route path="/campaigns" element={<CampaignsPage />} />
             <Route path="/transactional" element={<TransactionalPage />} />
