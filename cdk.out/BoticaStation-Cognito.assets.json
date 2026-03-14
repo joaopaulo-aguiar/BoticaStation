@@ -1,0 +1,21 @@
+{
+  "version": "52.0.0",
+  "files": {
+    "62d6acf6fda9f16776f777a616809c2078572dad1610843aafcea2bdb65452d8": {
+      "displayName": "BoticaStation-Cognito Template",
+      "source": {
+        "path": "BoticaStation-Cognito.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-us-east-1-d8019232": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1",
+          "objectKey": "62d6acf6fda9f16776f777a616809c2078572dad1610843aafcea2bdb65452d8.json",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-us-east-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

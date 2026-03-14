@@ -1,0 +1,21 @@
+{
+  "version": "52.0.0",
+  "files": {
+    "627f3f4d974513af54a2e792a8979b3967d33fdb82a8c95a4a4be821009265f4": {
+      "displayName": "BoticaStation-SES Template",
+      "source": {
+        "path": "BoticaStation-SES.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-us-east-1-219ce803": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1",
+          "objectKey": "627f3f4d974513af54a2e792a8979b3967d33fdb82a8c95a4a4be821009265f4.json",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-us-east-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

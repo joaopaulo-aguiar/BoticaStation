@@ -1,0 +1,21 @@
+{
+  "version": "52.0.0",
+  "files": {
+    "c7e114296aa7ec582616b465898640b1fdce388fd0dc3b53cec238f3b1b70771": {
+      "displayName": "BoticaStation-Workflows Template",
+      "source": {
+        "path": "BoticaStation-Workflows.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-us-east-1-4733be44": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1",
+          "objectKey": "c7e114296aa7ec582616b465898640b1fdce388fd0dc3b53cec238f3b1b70771.json",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-us-east-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

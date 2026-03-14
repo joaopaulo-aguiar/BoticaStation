@@ -1,0 +1,62 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    services:
+      dynamodb-local:
+        image: amazon/dynamodb-local
+        ports: ['8000:8000']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: npm }
+
+      - run: npm ci
+
+      - name: Testes + cobertura (obrigatório)
+        run: |
+          npm test
+          npm run test:coverage -- --coverageThreshold='{"global":{"lines":80}}'
+        env:
+          DYNAMODB_ENDPOINT: http://localhost:8000
+
+      - name: Autenticar na AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Build e push de imagens Docker (Fargate)
+        run: |
+          AWS_ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+          ECR_BASE="${AWS_ACCOUNT}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com"
+          aws ecr get-login-password | docker login --username AWS --password-stdin $ECR_BASE
+          # Adicione um bloco por container do projeto:
+          # docker build -t $ECR_BASE/nome-container:${{ github.sha }} ./src/containers/nome/
+          # docker push $ECR_BASE/nome-container:${{ github.sha }}
+
+      - name: Migrations DynamoDB pendentes
+        run: npm run migrate
+
+      - name: CDK Diff (salvo como artefato)
+        run: npx cdk diff --all 2>&1 | tee cdk-diff.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cdk-diff-${{ github.sha }}
+          path: cdk-diff.txt
+
+      - name: CDK Deploy
+        run: npx cdk deploy --all --require-approval never

@@ -1,0 +1,21 @@
+{
+  "version": "52.0.0",
+  "files": {
+    "5915127424ac761dc8e11b9efbc60aae38b35d3ebb6a8fb146c33c7112712f79": {
+      "displayName": "BoticaStation-Monitoring Template",
+      "source": {
+        "path": "BoticaStation-Monitoring.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-us-east-1-7af6d8d6": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1",
+          "objectKey": "5915127424ac761dc8e11b9efbc60aae38b35d3ebb6a8fb146c33c7112712f79.json",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-us-east-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

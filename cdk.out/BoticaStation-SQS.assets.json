@@ -1,0 +1,21 @@
+{
+  "version": "52.0.0",
+  "files": {
+    "b0e85548712f59f7de5a7f9e966a42bef7b02ae0ca3d337f9796bb6d814cc250": {
+      "displayName": "BoticaStation-SQS Template",
+      "source": {
+        "path": "BoticaStation-SQS.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-us-east-1-15fe82d1": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1",
+          "objectKey": "b0e85548712f59f7de5a7f9e966a42bef7b02ae0ca3d337f9796bb6d814cc250.json",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-us-east-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

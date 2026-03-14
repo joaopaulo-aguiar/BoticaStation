@@ -1,0 +1,113 @@
+{
+  "/BoticaStation-Dynamo": [
+    {
+      "type": "aws:cdk:stack-tags",
+      "data": [
+        {
+          "key": "ManagedBy",
+          "value": "CDK"
+        },
+        {
+          "key": "Project",
+          "value": "BoticaStation"
+        }
+      ]
+    }
+  ],
+  "/BoticaStation-Dynamo/ConfigTable": [
+    {
+      "type": "aws:cdk:hasPhysicalName",
+      "data": {
+        "Ref": "ConfigTable5CD72349"
+      }
+    }
+  ],
+  "/BoticaStation-Dynamo/ContactEventTable": [
+    {
+      "type": "aws:cdk:hasPhysicalName",
+      "data": {
+        "Ref": "ContactEventTableB5C5DDA7"
+      }
+    }
+  ],
+  "/BoticaStation-Dynamo/ContactTable": [
+    {
+      "type": "aws:cdk:hasPhysicalName",
+      "data": {
+        "Ref": "ContactTableB5543251"
+      }
+    }
+  ],
+  "/BoticaStation-Dynamo/ConfigTableName": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ConfigTableName"
+    }
+  ],
+  "/BoticaStation-Dynamo/ConfigTableArn": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ConfigTableArn"
+    }
+  ],
+  "/BoticaStation-Dynamo/ContactEventTableName": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ContactEventTableName"
+    }
+  ],
+  "/BoticaStation-Dynamo/ContactEventTableArn": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ContactEventTableArn"
+    }
+  ],
+  "/BoticaStation-Dynamo/ContactTableName": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ContactTableName"
+    }
+  ],
+  "/BoticaStation-Dynamo/ContactTableArn": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ContactTableArn"
+    }
+  ],
+  "/BoticaStation-Dynamo/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/BoticaStation-Dynamo/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/BoticaStation-Dynamo/ConfigTable/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ConfigTable5CD72349"
+    }
+  ],
+  "/BoticaStation-Dynamo/ContactEventTable/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ContactEventTableB5C5DDA7"
+    }
+  ],
+  "/BoticaStation-Dynamo/ContactTable/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ContactTableB5543251"
+    }
+  ],
+  "/BoticaStation-Dynamo/CDKMetadata/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CDKMetadata"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "version": "52.0.0",
+  "files": {
+    "a0fa19da26fd0538dda45239f25e03e2e40e9a76a60acb4cc88aa1f0a6d653e2": {
+      "displayName": "BoticaStation-AppSync Template",
+      "source": {
+        "path": "BoticaStation-AppSync.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-us-east-1-2d114dba": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1",
+          "objectKey": "a0fa19da26fd0538dda45239f25e03e2e40e9a76a60acb4cc88aa1f0a6d653e2.json",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-us-east-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

@@ -1,0 +1,21 @@
+{
+  "version": "52.0.0",
+  "files": {
+    "58b07db43e9a575a72d57e13e45aba79903ea114c83bb86abc6d25681196b45c": {
+      "displayName": "BoticaStation-ECS Template",
+      "source": {
+        "path": "BoticaStation-ECS.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "current_account-us-east-1-aff375f1": {
+          "bucketName": "cdk-hnb659fds-assets-${AWS::AccountId}-us-east-1",
+          "objectKey": "58b07db43e9a575a72d57e13e45aba79903ea114c83bb86abc6d25681196b45c.json",
+          "region": "us-east-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::${AWS::AccountId}:role/cdk-hnb659fds-file-publishing-role-${AWS::AccountId}-us-east-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

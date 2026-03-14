@@ -1,0 +1,15 @@
+{
+  "app": "npx tsx infra/bin/app.ts",
+  "watch": {
+    "include": ["infra/**", "src/shared/**", "src/config/**", "src/handlers/**"],
+    "exclude": ["node_modules", "cdk.out", "**/*.js", "**/*.d.ts"]
+  },
+  "context": {
+    "@aws-cdk/aws-lambda:recognizeLayerVersion": true,
+    "@aws-cdk/core:checkSecretUsage": true,
+    "@aws-cdk/core:target-partitions": ["aws"],
+    "@aws-cdk-containers/ecs-service-extensions:enableDefaultLogDriver": true,
+    "@aws-cdk/core:stackRelativeExports": true,
+    "@aws-cdk/aws-ecr-assets:dockerIgnoreSupport": true
+  }
+}

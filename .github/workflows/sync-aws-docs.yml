@@ -1,0 +1,48 @@
+name: Sync AWS Docs
+
+on:
+  schedule:
+    - cron: '0 12 * * 1'    # toda segunda-feira 9h (Brasília = UTC-3)
+  push:
+    branches: [main]
+  workflow_dispatch:          # execução manual sob demanda
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Autenticar na AWS via OIDC (somente leitura)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_SYNC_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Executar sync de documentação
+        run: npm run sync-docs
+
+      - name: Commit automático das docs atualizadas
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add aws-snapshot.json docs/ appsync/schema.graphql CHANGELOG.md
+          if git diff --staged --quiet; then
+            echo "Nenhuma mudança detectada — nada a commitar."
+          else
+            git commit -m "docs: sync automático com AWS $(date -u +%Y-%m-%d)"
+            git push
+          fi
